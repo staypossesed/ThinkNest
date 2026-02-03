@@ -3,3 +3,4 @@
 ### 2026-02-02 — update install instructions
 ### 2026-02-02 — minor CSS tweak
 ### 2026-02-02 — update .gitignore
+### 2026-02-03 — clarify env setup
