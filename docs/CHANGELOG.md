@@ -6,3 +6,4 @@
 ### 2026-02-03 — clarify env setup
 ### 2026-02-03 — aria-label in component
 ### 2026-02-04 — fix link formatting
+### 2026-02-04 — adjust spacing
