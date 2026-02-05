@@ -10,3 +10,4 @@
 ### 2026-02-04 — add troubleshooting note
 ### 2026-02-05 — reorder dependencies
 ### 2026-02-05 — update Ollama models list
+### 2026-02-05 — fix selector
