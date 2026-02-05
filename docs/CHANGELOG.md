@@ -8,3 +8,4 @@
 ### 2026-02-04 — fix link formatting
 ### 2026-02-04 — adjust spacing
 ### 2026-02-04 — add troubleshooting note
+### 2026-02-05 — reorder dependencies
