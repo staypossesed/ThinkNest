@@ -14,3 +14,4 @@
 ### 2026-02-05 — improve Russian section
 ### 2026-02-06 — typo in comment
 ### 2026-02-06 — add web mode note
+### 2026-02-06 — refine transition
