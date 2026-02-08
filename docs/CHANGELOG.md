@@ -16,3 +16,4 @@
 ### 2026-02-06 — add web mode note
 ### 2026-02-06 — refine transition
 ### 2026-02-08 — update Stripe section
+### 2026-02-08 — add .editorconfig
