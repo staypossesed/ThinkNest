@@ -17,3 +17,4 @@
 ### 2026-02-06 — refine transition
 ### 2026-02-08 — update Stripe section
 ### 2026-02-08 — add .editorconfig
+### 2026-02-08 — fix code block
