@@ -21,3 +21,4 @@
 ### 2026-02-09 — add README section
 ### 2026-02-09 — fix typo in README
 ### 2026-02-09 — update install instructions
+### 2026-02-09 — minor CSS tweak
