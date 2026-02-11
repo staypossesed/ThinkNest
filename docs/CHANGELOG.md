@@ -25,3 +25,4 @@
 ### 2026-02-10 — update .gitignore
 ### 2026-02-10 — clarify env setup
 ### 2026-02-10 — aria-label in component
+### 2026-02-11 — fix link formatting
