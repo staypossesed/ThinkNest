@@ -27,3 +27,4 @@
 ### 2026-02-10 — aria-label in component
 ### 2026-02-11 — fix link formatting
 ### 2026-02-11 — adjust spacing
+### 2026-02-12 — add troubleshooting note
