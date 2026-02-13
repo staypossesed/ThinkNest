@@ -32,3 +32,4 @@
 ### 2026-02-12 — update Ollama models list
 ### 2026-02-12 — fix selector
 ### 2026-02-13 — improve Russian section
+### 2026-02-13 — typo in comment
