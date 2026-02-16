@@ -38,3 +38,4 @@
 ### 2026-02-15 — update Stripe section
 ### 2026-02-15 — add .editorconfig
 ### 2026-02-16 — fix code block
+### 2026-02-16 — add README section
