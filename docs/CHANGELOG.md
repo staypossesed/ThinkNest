@@ -40,3 +40,4 @@
 ### 2026-02-16 — fix code block
 ### 2026-02-16 — add README section
 ### 2026-02-16 — fix typo in README
+### 2026-02-16 — update install instructions
