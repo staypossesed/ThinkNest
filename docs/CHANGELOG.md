@@ -42,3 +42,4 @@
 ### 2026-02-16 — fix typo in README
 ### 2026-02-16 — update install instructions
 ### 2026-02-17 — minor CSS tweak
+### 2026-02-17 — update .gitignore
