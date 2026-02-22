@@ -53,3 +53,4 @@
 ### 2026-02-20 — fix selector
 ### 2026-02-20 — improve Russian section
 ### 2026-02-20 — typo in comment
+### 2026-02-22 — add web mode note
