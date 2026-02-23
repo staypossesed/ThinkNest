@@ -55,3 +55,4 @@
 ### 2026-02-20 — typo in comment
 ### 2026-02-22 — add web mode note
 ### 2026-02-22 — refine transition
+### 2026-02-23 — update Stripe section
