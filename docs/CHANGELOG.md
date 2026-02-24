@@ -60,3 +60,4 @@
 ### 2026-02-23 — fix code block
 ### 2026-02-23 — add README section
 ### 2026-02-24 — fix typo in README
+### 2026-02-24 — update install instructions
