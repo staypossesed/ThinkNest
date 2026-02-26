@@ -64,3 +64,4 @@
 ### 2026-02-24 — minor CSS tweak
 ### 2026-02-25 — update .gitignore
 ### 2026-02-25 — clarify env setup
+### 2026-02-26 — aria-label in component
