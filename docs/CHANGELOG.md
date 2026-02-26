@@ -65,3 +65,4 @@
 ### 2026-02-25 — update .gitignore
 ### 2026-02-25 — clarify env setup
 ### 2026-02-26 — aria-label in component
+### 2026-02-26 — fix link formatting
