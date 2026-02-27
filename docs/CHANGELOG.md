@@ -68,3 +68,4 @@
 ### 2026-02-26 — fix link formatting
 ### 2026-02-26 — adjust spacing
 ### 2026-02-26 — add troubleshooting note
+### 2026-02-27 — reorder dependencies
