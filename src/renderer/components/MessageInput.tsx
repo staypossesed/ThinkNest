@@ -167,7 +167,7 @@ export default function MessageInput(props: MessageInputProps) {
 
   return (
     <div className="mx-auto max-w-3xl px-4 pb-8 pt-2">
-      <div className="flex flex-nowrap items-center gap-2 mb-4 overflow-x-auto scrollbar-chat">
+      <div className="flex flex-nowrap items-center gap-2 mb-4 overflow-visible py-2">
         <label
           className={`input-chip cursor-pointer border backdrop-blur-xl transition-colors duration-200 ${
             !canUseWebData
@@ -176,7 +176,7 @@ export default function MessageInput(props: MessageInputProps) {
                 ? "border-purple-500/40 bg-purple-500/15 text-purple-300"
                 : "border-white/15 bg-white/[0.07] text-gray-400 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
           }`}
-          title={!canUseWebData ? t(uiLocale, "featureProOnly") : undefined}
+          title={!canUseWebData ? t(uiLocale, "featureProOnly") : t(uiLocale, "useWebData")}
         >
           <input
             type="checkbox"
@@ -185,8 +185,8 @@ export default function MessageInput(props: MessageInputProps) {
             disabled={loading || !canUseWebData}
             className="sr-only"
           />
-          <Globe className="h-3.5 w-3.5 shrink-0" />
-          {t(uiLocale, "useWebData")}
+          <Globe className="input-chip-icon" />
+          {t(uiLocale, "useWebDataShort")}
         </label>
         <label
           className={`input-chip cursor-pointer border backdrop-blur-xl transition-colors duration-200 ${
@@ -205,7 +205,7 @@ export default function MessageInput(props: MessageInputProps) {
             disabled={loading || !canUseForecast}
             className="sr-only"
           />
-          <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+          <TrendingUp className="input-chip-icon" />
           {t(uiLocale, "forecast")}
         </label>
         <label
@@ -214,6 +214,7 @@ export default function MessageInput(props: MessageInputProps) {
               ? "border-purple-500/40 bg-purple-500/15 text-purple-300"
               : "border-white/15 bg-white/[0.07] text-gray-400 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
           }`}
+          title={t(uiLocale, "deepResearch")}
         >
           <input
             type="checkbox"
@@ -222,8 +223,8 @@ export default function MessageInput(props: MessageInputProps) {
             disabled={loading}
             className="sr-only"
           />
-          <Search className="h-3.5 w-3.5 shrink-0" />
-          {t(uiLocale, "deepResearch")}
+          <Search className="input-chip-icon" />
+          {t(uiLocale, "deepResearchShort")}
         </label>
         <input
           ref={fileInputRef}
@@ -241,17 +242,17 @@ export default function MessageInput(props: MessageInputProps) {
           className="input-chip border border-white/15 bg-white/[0.07] text-gray-400 backdrop-blur-xl transition-colors duration-200 hover:border-white/25 hover:bg-white/12 hover:text-gray-300 disabled:opacity-50"
           title={t(uiLocale, "attachImage")}
         >
-          <ImageIcon className="h-3.5 w-3.5 shrink-0" />
+          <ImageIcon className="input-chip-icon" />
           {t(uiLocale, "image")}
         </button>
         {onOpenMemory && canUseMemory && (
           <button
             type="button"
             onClick={onOpenMemory}
-            className="input-chip border border-white/15 bg-white/[0.07] text-gray-400 backdrop-blur-xl transition-colors duration-200 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
+            className="input-chip input-chip--icon-only border border-white/15 bg-white/[0.07] text-gray-400 backdrop-blur-xl transition-colors duration-200 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
             title={uiLocale === "ru" ? "Личная память" : "Memory"}
           >
-            <Brain className="h-3.5 w-3.5 shrink-0" />
+            <Brain className="input-chip-icon" />
           </button>
         )}
         {onExpertProfileChange && (
@@ -268,7 +269,7 @@ export default function MessageInput(props: MessageInputProps) {
             }`}
             title={!canUseExpertProfile ? t(uiLocale, "featureProOnly") : "Expert"}
           >
-            <User className="h-3.5 w-3.5 shrink-0" />
+            <User className="input-chip-icon" />
             {expertLabel(expertProfile)}
           </button>
         )}
@@ -276,7 +277,7 @@ export default function MessageInput(props: MessageInputProps) {
           type="button"
           onClick={handleVoice}
           disabled={loading || disabled || sttLoading}
-          className={`input-chip cursor-pointer border backdrop-blur-xl transition-colors duration-200 ${
+          className={`input-chip input-chip--icon-only cursor-pointer border backdrop-blur-xl transition-colors duration-200 ${
             listening
               ? "border-red-500/40 bg-red-500/15 text-red-400 animate-pulse"
               : "border-white/15 bg-white/[0.07] text-gray-400 hover:border-white/25 hover:bg-white/12 hover:text-gray-300 disabled:opacity-50"
@@ -292,9 +293,9 @@ export default function MessageInput(props: MessageInputProps) {
           }
         >
           {sttLoading ? (
-            <span className="h-3.5 w-3.5 shrink-0 animate-spin">⏳</span>
+            <span className="input-chip-icon flex items-center justify-center animate-spin">⏳</span>
           ) : (
-            <Mic className="h-3.5 w-3.5 shrink-0" />
+            <Mic className="input-chip-icon" />
           )}
         </button>
       </div>

@@ -102,19 +102,18 @@ body {
   display: none;
 }
 
-/* Input chips — fixed size 100x32, same form/color, one row, no wrap */
+/* Input chips — гибкая ширина, одна строка без горизонтального скролла */
 .input-chip {
-  width: 112px !important;
-  min-width: 112px !important;
-  max-width: 112px !important;
-  height: 32px !important;
-  padding: 0 8px !important;
-  flex-shrink: 0;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 118px;
+  height: 36px !important;
+  padding: 0 10px !important;
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  font-size: 11px !important;
+  gap: 8px;
+  font-size: 12px !important;
   font-weight: 500;
   border-radius: 9999px;
   white-space: nowrap;
@@ -123,11 +122,21 @@ body {
   transform-origin: center;
   transition: transform 0.12s ease-out, background-color 0.15s ease, border-color 0.15s ease;
 }
+.input-chip.input-chip--icon-only {
+  flex: 0 0 40px;
+  min-width: 40px;
+  max-width: 40px;
+}
 .input-chip:hover:not(:disabled) {
-  transform: scale(1.05);
+  transform: scale(1.15);
 }
 .input-chip:active:not(:disabled) {
   transform: scale(0.98);
+}
+.input-chip-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
 }
 
 .app {
