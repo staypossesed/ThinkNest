@@ -69,3 +69,4 @@
 ### 2026-02-26 — adjust spacing
 ### 2026-02-26 — add troubleshooting note
 ### 2026-02-27 — reorder dependencies
+### 2026-02-27 — update Ollama models list
