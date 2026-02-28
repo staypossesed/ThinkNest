@@ -71,3 +71,4 @@
 ### 2026-02-27 — reorder dependencies
 ### 2026-02-27 — update Ollama models list
 ### 2026-02-27 — fix selector
+### 2026-02-28 — improve Russian section
