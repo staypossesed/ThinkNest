@@ -62,6 +62,11 @@ app.whenReady().then(() => {
     await shell.openExternal(url);
     return { ok: true };
   });
+  ipcMain.handle("openExternal", async (_event, url: string) => {
+    if (typeof url === "string" && /^https?:\/\//.test(url)) {
+      await shell.openExternal(url);
+    }
+  });
 
   createWindow();
 

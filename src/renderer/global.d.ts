@@ -23,6 +23,7 @@ declare global {
       consumeUsage: (question: string) => Promise<ConsumeUsageResponse>;
       openCheckout: () => Promise<{ ok: true }>;
       openPortal: () => Promise<{ ok: true }>;
+      openExternal: (url: string) => Promise<void>;
       isDevMode: () => Promise<boolean>;
     };
   }

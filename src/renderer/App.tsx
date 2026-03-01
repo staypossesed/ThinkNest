@@ -17,6 +17,9 @@ export default function App() {
   const [finalAnswer, setFinalAnswer] = useState<AskResponse["final"] | null>(
     null
   );
+  const [useWebData, setUseWebData] = useState(false);
+  const [forecastMode, setForecastMode] = useState(false);
+  const [webSources, setWebSources] = useState<AskResponse["webSources"] | null>(null);
   const [session, setSession] = useState<SessionState>({ token: null, user: null });
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
   const [loadingSession, setLoadingSession] = useState(true);
@@ -125,6 +128,7 @@ export default function App() {
     setLoading(true);
     setAnswers([]);
     setFinalAnswer(null);
+    setWebSources(null);
     setError(null);
 
     try {
@@ -138,7 +142,9 @@ export default function App() {
       const response = await window.api.ask(
         {
           question: trimmed,
-          maxAgents: canAsk.entitlements.maxAgents
+          maxAgents: canAsk.entitlements.maxAgents,
+          useWebData,
+          forecastMode
         },
         (answer) => {
           setAnswers((prev) => {
@@ -154,6 +160,7 @@ export default function App() {
       );
       setAnswers(response.answers);
       setFinalAnswer(response.final);
+      setWebSources(response.webSources ?? null);
       const usage = await window.api.consumeUsage(trimmed);
       setEntitlements(usage.entitlements);
     } catch (err) {
@@ -237,6 +244,26 @@ export default function App() {
           rows={4}
           disabled={loading}
         />
+        <div className="toggles">
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={useWebData}
+              onChange={(e) => setUseWebData(e.target.checked)}
+              disabled={loading}
+            />
+            <span>Use Web Data</span>
+          </label>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={forecastMode}
+              onChange={(e) => setForecastMode(e.target.checked)}
+              disabled={loading}
+            />
+            <span>Режим прогнозирования</span>
+          </label>
+        </div>
         <div className="actions">
           <button
             type="button"
@@ -297,6 +324,25 @@ export default function App() {
             </p>
             <p className="content">{finalAnswer.content}</p>
           </>
+        )}
+        {webSources && webSources.results.length > 0 && (
+          <div className="sources">
+            <h3>Веб-источники</h3>
+            <ul>
+              {webSources.results.map((s, i) => (
+                <li key={i}>
+                  <button
+                    type="button"
+                    className="source-link"
+                    onClick={() => window.api.openExternal(s.url)}
+                  >
+                    {s.title || s.url}
+                  </button>
+                  {s.snippet && <span className="source-snippet">{s.snippet.slice(0, 120)}…</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </section>
     </div>

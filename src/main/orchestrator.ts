@@ -1,9 +1,17 @@
 import { performance } from "node:perf_hooks";
-import { AskRequest, AskResponse, AgentAnswer, AgentId, OnAgentAnswer } from "../shared/types";
+import {
+  AskRequest,
+  AskResponse,
+  AgentAnswer,
+  AgentId,
+  OnAgentAnswer,
+  WebSource
+} from "../shared/types";
 import { chatCompletion } from "./ollama";
 import { ollamaConfig } from "./config";
+import { searchWeb, formatWebContext } from "./webSearch";
 
-const agentProfiles: Array<{
+const baseAgentProfiles: Array<{
   id: AgentId;
   title: string;
   systemPrompt: string;
@@ -40,6 +48,9 @@ const agentProfiles: Array<{
       "Ты объяснитель. Дай свою точку зрения: объясни простыми словами, чтобы было понятно любому."
   }
 ];
+
+const forecastSystemSuffix =
+  "\n\nРежим прогнозирования: дай 2–3 сценария развития событий с оценкой вероятности (низкая/средняя/высокая). Укажи ключевые факторы и источники неопределённости.";
 
 async function runSequential<T, R>(
   items: T[],
@@ -79,8 +90,35 @@ export async function askQuestion(
   }
   await checkOllamaAvailable(ollamaConfig.baseUrl);
 
+  const useWebData = !!request.useWebData;
+  const forecastMode = !!request.forecastMode;
+
+  let webSources: WebSource[] = [];
+  let webContext = "";
+  if (useWebData) {
+    const results = await searchWeb(question);
+    webSources = results.map((r) => ({
+      title: r.title,
+      url: r.url,
+      snippet: r.snippet
+    }));
+    webContext = formatWebContext(results);
+  }
+
+  const agentProfiles = baseAgentProfiles.map((a) => ({
+    ...a,
+    systemPrompt:
+      a.systemPrompt +
+      (forecastMode ? forecastSystemSuffix : "") +
+      (webContext ? "\n\nИспользуй актуальные данные из веба при ответе." : "")
+  }));
+
   const maxAgents = Math.max(1, Math.min(4, request.maxAgents ?? 4));
   const activeAgents = agentProfiles.slice(0, maxAgents);
+
+  const userContent = webContext
+    ? `${webContext}\n\n---\nВопрос: ${question}`
+    : question;
 
   const runAgent = async (
     agent: (typeof agentProfiles)[number]
@@ -95,7 +133,7 @@ export async function askQuestion(
         numPredict: agent.numPredict,
         messages: [
           { role: "system", content: agent.systemPrompt },
-          { role: "user", content: question }
+          { role: "user", content: userContent }
         ]
       });
       const durationMs = Math.round(performance.now() - start);
@@ -128,31 +166,33 @@ export async function askQuestion(
     : await Promise.all(activeAgents.map(runAgent));
 
   const aggStart = performance.now();
+  const aggSystem =
+    "Ты агрегатор. У тебя ответы от нескольких агентов на один вопрос. " +
+    "Игнорируй ответы с текстом 'Ошибка агента'. " +
+    "Выбери лучшее из успешных ответов, объедини в один чёткий итог. " +
+    "В конце добавь блок: **Источники:** перечисли, какие агенты (Планировщик, Критик, Практик, Объяснитель) дали полезный вклад. " +
+    (webSources.length > 0
+      ? "Также укажи использованные веб-источники (URL) если они были задействованы. "
+      : "") +
+    (forecastMode
+      ? "Сохрани сценарии и оценки вероятности в итоге. "
+      : "") +
+    "Будь ясным, практичным, без воды.";
+
   try {
     const final = await chatCompletion({
       baseUrl: ollamaConfig.baseUrl,
       model: ollamaConfig.aggregatorModel,
       timeoutMs: ollamaConfig.timeoutMs,
       messages: [
-        {
-          role: "system",
-          content:
-            "Ты агрегатор. У тебя ответы от нескольких агентов на один вопрос. " +
-            "Игнорируй ответы с текстом 'Ошибка агента'. " +
-            "Выбери лучшее из успешных ответов, объедини в один чёткий итог. " +
-            "В конце добавь блок: **Источники:** перечисли, какие агенты (Планировщик, Критик, Практик, Объяснитель) дали полезный вклад. " +
-            "Будь ясным, практичным, без воды."
-        },
-        {
-          role: "user",
-          content: buildAggregationInput(question, answers)
-        }
+        { role: "system", content: aggSystem },
+        { role: "user", content: buildAggregationInput(question, answers) }
       ]
     });
 
     const finalDuration = Math.round(performance.now() - aggStart);
 
-    return {
+    const response: AskResponse = {
       answers,
       final: {
         content: final,
@@ -160,10 +200,14 @@ export async function askQuestion(
         durationMs: finalDuration
       }
     };
+    if (webSources.length > 0) {
+      response.webSources = { query: question, results: webSources };
+    }
+    return response;
   } catch (error) {
     const finalDuration = Math.round(performance.now() - aggStart);
     const fallback = answers.find((answer) => answer.content.trim())?.content ?? "";
-    return {
+    const resp: AskResponse = {
       answers,
       final: {
         content:
@@ -173,6 +217,10 @@ export async function askQuestion(
         durationMs: finalDuration
       }
     };
+    if (webSources.length > 0) {
+      resp.webSources = { query: question, results: webSources };
+    }
+    return resp;
   }
 }
 

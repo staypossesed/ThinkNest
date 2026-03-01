@@ -3,6 +3,21 @@ export type AgentId = "planner" | "critic" | "pragmatist" | "explainer";
 export interface AskRequest {
   question: string;
   maxAgents?: number;
+  /** Use web search for fresh data */
+  useWebData?: boolean;
+  /** Forecast mode: scenarios + confidence */
+  forecastMode?: boolean;
+}
+
+export interface WebSource {
+  title: string;
+  url: string;
+  snippet?: string;
+}
+
+export interface AskResponseSources {
+  query: string;
+  results: WebSource[];
 }
 
 /** Вызывается при каждом ответе агента (для live-отображения) */
@@ -23,6 +38,8 @@ export interface AskResponse {
     model: string;
     durationMs: number;
   };
+  /** Present when useWebData=true */
+  webSources?: AskResponseSources;
 }
 
 export interface UserProfile {
