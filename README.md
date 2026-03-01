@@ -1,0 +1,158 @@
+# Multi Agent Desktop (Free/Pro MVP)
+
+Desktop-приложение на Electron + React с 4 AI-агентами и итоговым агрегатором.
+Поддерживает:
+- Google login
+- Free/Pro тарифы
+- Stripe подписку (Checkout + Portal)
+- лимиты запросов на backend (Supabase)
+
+## Стек
+- Desktop: Electron + React + TypeScript
+- Backend: Fastify + TypeScript
+- DB/Auth storage: Supabase
+- Billing: Stripe
+- LLM runtime: Ollama (локально у пользователя)
+
+## 1) Локальная разработка
+
+### Требования
+- Node.js LTS
+- Ollama
+- Аккаунты: Supabase, Stripe, Google Cloud OAuth
+
+### Установка
+```bash
+npm install
+npm --prefix backend install
+```
+
+### Установка моделей Ollama
+```bash
+ollama pull llama3.1
+ollama pull mistral
+ollama pull qwen2.5
+ollama pull phi3
+```
+
+### Переменные окружения
+1. Скопируй `backend/.env.example` -> `backend/.env` и заполни все ключи.
+2. Скопируй `.env.example` -> `.env` в корне (desktop env).
+
+### Запуск
+
+**Режим разработки (без backend и Google):**
+```bash
+npm run dev:local
+```
+Запускает только desktop с 4 агентами и без лимитов. Идеально для тестирования и доработки. Ollama должен быть запущен.
+
+**Полный стек (с backend, Google, Stripe):**
+```bash
+npm run dev
+```
+Команда запускает одновременно:
+- backend (`http://localhost:8787`)
+- renderer (`http://localhost:5173`)
+- electron main process
+
+## 2) Настройка Supabase
+
+1. Создай проект в Supabase.
+2. Выполни SQL из:
+   - `backend/supabase/migrations/001_init.sql`
+3. В `backend/.env` добавь:
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+
+## 3) Настройка Google OAuth
+
+1. В Google Cloud Console создай OAuth Client.
+2. Redirect URI:
+   - `http://localhost:8787/auth/google/callback` (dev)
+   - `https://<your-backend-domain>/auth/google/callback` (prod)
+3. В `backend/.env` добавь:
+   - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_CLIENT_SECRET`
+   - `GOOGLE_REDIRECT_URI`
+
+## 4) Настройка Stripe
+
+1. Создай Product `Pro` и monthly Price в Stripe.
+2. Добавь в `backend/.env`:
+   - `STRIPE_SECRET_KEY`
+   - `STRIPE_PRICE_PRO_MONTHLY`
+   - `STRIPE_SUCCESS_URL`
+   - `STRIPE_CANCEL_URL`
+3. Создай webhook endpoint:
+   - `POST https://<your-backend-domain>/webhooks/stripe`
+4. Подпишись минимум на события:
+   - `checkout.session.completed`
+   - `customer.subscription.created`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+5. Добавь `STRIPE_WEBHOOK_SECRET` в `backend/.env`.
+
+## 5) Деплой backend на Railway
+
+1. Создай проект на Railway и подключи репозиторий.
+2. Root directory: `backend`.
+3. Build command:
+   - `npm install && npm run build`
+4. Start command:
+   - `npm run start`
+5. Добавь все переменные из `backend/.env`.
+6. После деплоя проверь:
+   - `GET https://<domain>/health`
+
+## 6) Конфигурация desktop под production
+
+1. Перед сборкой задай production backend URL:
+```powershell
+$env:BACKEND_API_URL="https://<your-backend-domain>"
+```
+2. Сборка Windows:
+```bash
+npm run package
+```
+3. Установщик появится в `dist/app`.
+
+## 7) Free/Pro логика (MVP)
+
+- Free:
+  - 2 агента
+  - 20 запросов в день
+- Pro:
+  - 4 агента
+  - 500 запросов в месяц
+
+Лимиты применяются на backend через `entitlements` + `usage`.
+
+## 8) Юридический дисклеймер
+
+В UI встроен дисклеймер:
+- ответы по юридическим вопросам носят информационный характер
+- не заменяют консультацию юриста
+
+## 9) Устранение проблем (Ollama)
+
+**"This operation was aborted" / таймаут:**
+- Таймаут 120 сек. Если Критик (mistral) всё равно падает — попробуй `ollama pull mistral:7b` и в `config.ts` замени `critic: "mistral"` на `critic: "mistral:7b"`.
+- По умолчанию агенты запускаются **последовательно** (надёжнее). Для параллельного — `SEQUENTIAL_AGENTS=false`.
+
+**Только 1 ответ из 4:**
+- Убедись, что все 4 модели скачаны: `ollama pull llama3.1 mistral qwen2.5 phi3`. Ollama должен быть запущен и доступен.
+
+**Итог без ссылок на модели:**
+- Агрегатор теперь добавляет блок **Источники:** с перечислением агентов, давших вклад.
+
+## 10) QA чеклист (e2e)
+
+- [ ] Google login проходит успешно и сессия сохраняется.
+- [ ] `GET /entitlements` возвращает Free после регистрации.
+- [ ] Free: после 20 запросов `canAsk` блокирует запрос.
+- [ ] Stripe checkout переводит пользователя в Pro.
+- [ ] После webhook в БД появляется активная подписка.
+- [ ] Pro: доступно 4 агента и увеличенный лимит.
+- [ ] Portal открывается и подписка управляется.
+- [ ] Отмена подписки возвращает entitlement на Free.
