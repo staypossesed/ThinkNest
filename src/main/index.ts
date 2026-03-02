@@ -1,6 +1,12 @@
 import "dotenv/config";
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import dotenv from "dotenv";
 import path from "node:path";
+import { app, BrowserWindow, ipcMain, shell } from "electron";
+
+// Web search (SERPER_API_KEY) может быть в backend/.env
+const backendEnv = path.join(process.cwd(), "backend", ".env");
+dotenv.config({ path: backendEnv });
+
 import { askQuestion } from "./orchestrator";
 import { AskRequest } from "../shared/types";
 import { backendClient, isDevMode } from "./backend";

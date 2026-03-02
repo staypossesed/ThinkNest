@@ -14,6 +14,8 @@ interface GoogleUserInfo {
   email_verified: boolean;
   name?: string;
   picture?: string;
+  /** Язык аккаунта Google, напр. "ru", "en" */
+  locale?: string;
 }
 
 export function createGoogleAuthUrl(state: string): string {

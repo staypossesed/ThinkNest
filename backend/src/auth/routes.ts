@@ -9,6 +9,7 @@ interface PendingAuthState {
   createdAt: number;
   done: boolean;
   token?: string;
+  locale?: string;
   error?: string;
   mode: "desktop" | "web";
   redirectPath?: string;
@@ -85,7 +86,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     if (pending.error) {
       return { status: "error", error: pending.error };
     }
-    return { status: "success", token: pending.token };
+    return { status: "success", token: pending.token, locale: pending.locale };
   });
 
   app.get("/auth/google/callback", async (request, reply) => {
@@ -134,6 +135,7 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
       const token = await createSessionToken({ sub: user.id, email: user.email });
       pending.done = true;
       pending.token = token;
+      pending.locale = profile.locale ?? undefined;
 
       if (pending.mode === "web") {
         return reply

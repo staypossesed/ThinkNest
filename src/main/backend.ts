@@ -58,9 +58,9 @@ class BackendClient {
 
     try {
       const profile = await this.request<UserProfile>("/me", { method: "GET" }, true);
-      this.user = profile;
+      this.user = { ...profile, locale: this.user?.locale ?? profile.locale };
       await this.persistSession();
-      return { token: this.token, user: profile };
+      return { token: this.token, user: this.user };
     } catch {
       await this.clearSession();
       return { token: null, user: null };
@@ -78,9 +78,10 @@ class BackendClient {
     );
 
     await shell.openExternal(start.authUrl);
-    const token = await this.pollAuthToken(start.state);
+    const { token, locale } = await this.pollAuthToken(start.state);
     this.token = token;
-    this.user = await this.request<UserProfile>("/me", { method: "GET" }, true);
+    const profile = await this.request<UserProfile>("/me", { method: "GET" }, true);
+    this.user = { ...profile, locale };
     await this.persistSession();
     return { token: this.token, user: this.user };
   }
@@ -152,16 +153,19 @@ class BackendClient {
     return response.url;
   }
 
-  private async pollAuthToken(state: string): Promise<string> {
+  private async pollAuthToken(
+    state: string
+  ): Promise<{ token: string; locale?: string }> {
     for (let i = 0; i < 120; i += 1) {
-      const response = await this.request<{ status: string; token?: string; error?: string }>(
-        `/auth/google/poll?state=${encodeURIComponent(state)}`,
-        { method: "GET" },
-        false
-      );
+      const response = await this.request<{
+        status: string;
+        token?: string;
+        locale?: string;
+        error?: string;
+      }>(`/auth/google/poll?state=${encodeURIComponent(state)}`, { method: "GET" }, false);
 
       if (response.status === "success" && response.token) {
-        return response.token;
+        return { token: response.token, locale: response.locale };
       }
       if (response.status === "error") {
         throw new Error(response.error ?? "Google login failed");
