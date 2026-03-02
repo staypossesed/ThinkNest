@@ -4,13 +4,14 @@ export const ollamaConfig = {
   timeoutMs: Number(process.env.OLLAMA_TIMEOUT_MS ?? 120000),
   /** Параллельный запуск по умолчанию — быстрее (max вместо sum). SEQUENTIAL_AGENTS=true для последовательного. */
   sequentialAgents: process.env.SEQUENTIAL_AGENTS === "true",
-  /** Модели для 4 агентов — разные, чтобы ответы отличались */
-  /** Модели — разные для 4 точек зрения */
+  /** Модели: Planner/Crit/Prag — mistral/llama3.1; Explainer — phi3 (быстрый, без абортов) */
   agents: {
     planner: "mistral",
-    critic: "qwen2.5",
-    pragmatist: "qwen2.5",
-    explainer: "qwen2.5"
+    critic: "llama3.1",
+    pragmatist: "mistral",
+    explainer: "phi3"
   },
-  aggregatorModel: "llama3.1"
+  aggregatorModel: "llama3.1",
+  /** Vision model для распознавания картинок (llava, llava:7b и т.п.) */
+  visionModel: process.env.OLLAMA_VISION_MODEL ?? "llava"
 };

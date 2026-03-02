@@ -1,9 +1,29 @@
-import { useEffect, useMemo, useState } from "react";
-import type { AgentAnswer, AskResponse, Entitlements, SessionState } from "../shared/types";
-import logo from "./assets/logo.png";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type {
+  AgentAnswer,
+  AskResponse,
+  ConversationMessage,
+  Entitlements,
+  SessionState
+} from "../shared/types";
+import ChatSidebar from "./components/ChatSidebar";
+import ChatMain from "./components/ChatMain";
+import MessageInput from "./components/MessageInput";
+import LanguageSelector, { type UiLocale } from "./components/LanguageSelector";
+import { useConversations } from "./hooks/useConversations";
+import { usePlaceholder } from "./hooks/usePlaceholder";
+
+const LANG_STORAGE_KEY = "thinknest_ui_locale";
+
+function detectSystemLocale(): UiLocale {
+  if (typeof navigator === "undefined") return "ru";
+  const lang = (navigator.language ?? navigator.languages?.[0] ?? "").toLowerCase();
+  if (/^(ru|uk|be)/.test(lang)) return "ru";
+  if (/^zh/.test(lang)) return "zh";
+  return "en";
+}
 
 const agentOrder = ["planner", "critic", "pragmatist", "explainer"] as const;
-
 const agentLabels: Record<(typeof agentOrder)[number], string> = {
   planner: "Планировщик",
   critic: "Критик",
@@ -13,36 +33,67 @@ const agentLabels: Record<(typeof agentOrder)[number], string> = {
 
 export default function App() {
   const [question, setQuestion] = useState("");
+  const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [answers, setAnswers] = useState<AgentAnswer[]>([]);
-  const [finalAnswer, setFinalAnswer] = useState<AskResponse["final"] | null>(
-    null
-  );
   const [useWebData, setUseWebData] = useState(false);
   const [forecastMode, setForecastMode] = useState(false);
-  const [webSources, setWebSources] = useState<AskResponse["webSources"] | null>(null);
   const [session, setSession] = useState<SessionState>({ token: null, user: null });
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
   const [loadingSession, setLoadingSession] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [devMode, setDevMode] = useState(false);
+  const [uiLocale, setUiLocale] = useState<UiLocale>(() => {
+    try {
+      const s = localStorage.getItem(LANG_STORAGE_KEY);
+      if (s === "ru" || s === "en" || s === "zh") return s;
+    } catch {}
+    return detectSystemLocale();
+  });
 
-  const answerMap = useMemo(() => {
-    return new Map(answers.map((answer) => [answer.id, answer]));
-  }, [answers]);
+  const answersRef = useRef<AgentAnswer[]>([]);
 
-  const profileName = useMemo(() => {
-    if (!session.user) {
-      return "Guest";
-    }
-    if (session.user.fullName?.trim()) {
-      return session.user.fullName.trim().split(/\s+/)[0];
-    }
-    return session.user.email.split("@")[0];
-  }, [session.user]);
+  const handleLocaleChange = (locale: UiLocale) => {
+    setUiLocale(locale);
+    try {
+      localStorage.setItem(LANG_STORAGE_KEY, locale);
+    } catch {}
+  };
 
-  const legalHint =
-    "Важно: ответы по юридическим вопросам носят информационный характер и не заменяют консультацию юриста.";
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(LANG_STORAGE_KEY)) return;
+      const loc = session.user?.locale?.toLowerCase();
+      if (!loc) return;
+      const fromGoogle: UiLocale = /^(ru|uk|be)/.test(loc) ? "ru" : /^zh/.test(loc) ? "zh" : "en";
+      setUiLocale(fromGoogle);
+      localStorage.setItem(LANG_STORAGE_KEY, fromGoogle);
+    } catch {}
+  }, [session.user?.locale]);
+
+  const {
+    conversations,
+    activeId,
+    activeConversation,
+    createConversationWithFirstMessage,
+    addMessagePlaceholder,
+    updateMessage,
+    selectConversation,
+    deleteConversation,
+    newChat
+  } = useConversations(devMode);
+
+  const messages = activeConversation?.messages ?? [];
+  const maxAgents = entitlements?.maxAgents ?? 4;
+  const inputPlaceholder = usePlaceholder(uiLocale);
+
+  const statusText = useMemo(() => {
+    if (!loading) return "";
+    if (messages.length === 0) return "Планировщик отвечает...";
+    const last = messages[messages.length - 1];
+    const count = last?.answers.length ?? 0;
+    if (count >= maxAgents) return "Формирую итог...";
+    return `${agentLabels[agentOrder[count]]} отвечает...`;
+  }, [loading, messages, maxAgents]);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -91,8 +142,6 @@ export default function App() {
     await window.api.logout();
     setSession({ token: null, user: null });
     setEntitlements(null);
-    setAnswers([]);
-    setFinalAnswer(null);
   };
 
   const handleUpgrade = async () => {
@@ -118,52 +167,82 @@ export default function App() {
 
   const submit = async () => {
     const trimmed = question.trim();
-    if (!trimmed || loading) {
-      return;
-    }
+    const hasContent = trimmed || attachedImages.length > 0;
+    if (!hasContent || loading) return;
     if (!devMode && !session.token) {
       setError("Сначала войдите через Google.");
       return;
     }
 
+    const fallbackQuestion =
+      uiLocale === "zh" ? "描述图片内容" : uiLocale === "en" ? "Describe what's in the image" : "Опиши что на картинке";
+    const questionText = trimmed || fallbackQuestion;
     setLoading(true);
-    setAnswers([]);
-    setFinalAnswer(null);
-    setWebSources(null);
     setError(null);
+
+    let conv: { id: string };
+    let placeholder: ConversationMessage;
+    if (!activeConversation) {
+      const result = createConversationWithFirstMessage(questionText, {
+        useWebData,
+        forecastMode,
+        images: attachedImages.length > 0 ? attachedImages : undefined
+      });
+      conv = result.conv;
+      placeholder = result.placeholder;
+    } else {
+      conv = activeConversation;
+      placeholder = addMessagePlaceholder(conv.id, questionText, {
+        useWebData,
+        forecastMode,
+        images: attachedImages.length > 0 ? attachedImages : undefined
+      });
+    }
+
+    answersRef.current = [];
 
     try {
       const canAsk = await window.api.canAsk();
       setEntitlements(canAsk.entitlements);
       if (!canAsk.allowed) {
         setError(canAsk.reason ?? "Лимит исчерпан. Обновите план до Pro.");
+        setLoading(false);
         return;
       }
 
+      const preferredLocale: "ru" | "en" | "zh" = uiLocale;
+
       const response = await window.api.ask(
         {
-          question: trimmed,
+          question: questionText,
           maxAgents: canAsk.entitlements.maxAgents,
           useWebData,
-          forecastMode
+          forecastMode,
+          preferredLocale,
+          images: attachedImages.length > 0 ? attachedImages : undefined
         },
-        (answer) => {
-          setAnswers((prev) => {
-            const next = prev.filter((a) => a.id !== answer.id);
-            next.push(answer);
-            next.sort(
-              (a, b) =>
-                agentOrder.indexOf(a.id) - agentOrder.indexOf(b.id)
-            );
-            return next;
+        (answer: AgentAnswer) => {
+          answersRef.current = answersRef.current.filter((a) => a.id !== answer.id);
+          answersRef.current.push(answer);
+          answersRef.current.sort(
+            (a, b) => agentOrder.indexOf(a.id) - agentOrder.indexOf(b.id)
+          );
+          updateMessage(conv.id, placeholder.id, {
+            answers: [...answersRef.current]
           });
         }
       );
-      setAnswers(response.answers);
-      setFinalAnswer(response.final);
-      setWebSources(response.webSources ?? null);
-      const usage = await window.api.consumeUsage(trimmed);
+
+      updateMessage(conv.id, placeholder.id, {
+        answers: response.answers,
+        final: response.final,
+        webSources: response.webSources ?? null
+      });
+
+      const usage = await window.api.consumeUsage(questionText);
       setEntitlements(usage.entitlements);
+      setQuestion("");
+      setAttachedImages([]);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Не удалось получить ответ.";
@@ -173,182 +252,60 @@ export default function App() {
     }
   };
 
+  const handleNewChat = () => {
+    newChat();
+    setQuestion("");
+    setAttachedImages([]);
+    setError(null);
+  };
+
   return (
-    <div className="app">
-      <header className="header">
-        <div className="header-brand">
-          <img src={logo} alt="" className="header-logo" />
-          <h1>Multi Agent Desktop</h1>
+    <div className="app app--chat">
+      <ChatSidebar
+        conversations={conversations}
+        activeId={activeId}
+        onSelect={selectConversation}
+        onNewChat={handleNewChat}
+        onDelete={deleteConversation}
+        session={session}
+        entitlements={entitlements}
+        devMode={devMode}
+        onLogin={handleLogin}
+        onLogout={handleLogout}
+        onUpgrade={handleUpgrade}
+        onManageBilling={handleManageBilling}
+        onRefreshPlan={refreshEntitlements}
+        loadingSession={loadingSession}
+      />
+      <main className="app-main">
+        <div className="chat-topbar">
+          <div className="chat-topbar-spacer" />
+          <LanguageSelector value={uiLocale} onChange={handleLocaleChange} />
         </div>
-        <p>Free/Pro AI-помощник: 4 агента + лучший итоговый ответ.</p>
-      </header>
-
-      <section className="card">
-        <div className="topbar">
-          <div>
-            {devMode ? (
-              <p className="meta dev-badge">
-                Режим разработки: 4 агента, без лимитов. Backend не нужен.
-              </p>
-            ) : session.user ? (
-              <>
-                <p className="meta">
-                  {profileName} • План: {entitlements?.plan ?? "unknown"}
-                </p>
-                {entitlements && (
-                  <p className="meta">
-                    Лимит: {entitlements.usedQuestions}/{entitlements.maxQuestions} (
-                    {entitlements.remainingQuestions} осталось)
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="meta">Войдите через Google, чтобы использовать Free/Pro лимиты.</p>
-            )}
-          </div>
-          <div className="row-actions">
-            {!devMode && !session.user && (
-              <button type="button" onClick={handleLogin} disabled={loadingSession}>
-                {loadingSession ? "Подключаю..." : "Войти через Google"}
-              </button>
-            )}
-            {!devMode && session.user && (
-              <>
-                <button type="button" onClick={refreshEntitlements}>
-                  Refresh plan
-                </button>
-                {entitlements?.plan === "free" && (
-                  <button type="button" onClick={handleUpgrade}>
-                    Upgrade to Pro
-                  </button>
-                )}
-                {entitlements?.plan === "pro" && (
-                  <button type="button" onClick={handleManageBilling}>
-                    Manage billing
-                  </button>
-                )}
-                <button type="button" onClick={handleLogout}>
-                  Выйти
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section className="card">
-        <label className="label" htmlFor="question">
-          Ваш вопрос
-        </label>
-        <textarea
-          id="question"
-          value={question}
-          onChange={(event) => setQuestion(event.target.value)}
-          placeholder="Например: Как быстрее убрать квартиру перед гостями?"
-          rows={4}
-          disabled={loading}
+        <ChatMain
+          messages={messages}
+          loading={loading}
+          maxAgents={maxAgents}
         />
-        <div className="toggles">
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={useWebData}
-              onChange={(e) => setUseWebData(e.target.checked)}
-              disabled={loading}
-            />
-            <span>Use Web Data</span>
-          </label>
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={forecastMode}
-              onChange={(e) => setForecastMode(e.target.checked)}
-              disabled={loading}
-            />
-            <span>Режим прогнозирования</span>
-          </label>
+        <div className="app-input-wrap">
+          <MessageInput
+            value={question}
+            onChange={setQuestion}
+            onSubmit={submit}
+            loading={loading}
+            disabled={!devMode && !session.token}
+            useWebData={useWebData}
+            forecastMode={forecastMode}
+            onUseWebDataChange={setUseWebData}
+            onForecastModeChange={setForecastMode}
+            statusText={statusText}
+            error={error}
+            placeholder={inputPlaceholder}
+            images={attachedImages}
+            onImagesChange={setAttachedImages}
+          />
         </div>
-        <div className="actions">
-          <button
-            type="button"
-            onClick={submit}
-            disabled={loading || question.trim().length === 0}
-          >
-            {loading
-              ? answers.length >= (entitlements?.maxAgents ?? 4)
-                ? "Формирую итог..."
-                : answers.length > 0
-                  ? `${agentLabels[agentOrder[answers.length]]} отвечает...`
-                  : "Планировщик отвечает..."
-              : "Спросить"}
-          </button>
-        </div>
-        {error && <div className="error">{error}</div>}
-        <div className="hint">{legalHint}</div>
-      </section>
-
-      <section className="grid">
-        {agentOrder.map((agentId, idx) => {
-          const maxAgents = entitlements?.maxAgents ?? 2;
-          const isEnabled = idx < maxAgents;
-          const answer = answerMap.get(agentId);
-          return (
-            <article key={agentId} className="card">
-              <h2>
-                {agentLabels[agentId]} {!isEnabled && <span className="pill">Pro</span>}
-              </h2>
-              {!isEnabled && (
-                <p className="muted">Доступно в плане Pro (4 агента вместо 2).</p>
-              )}
-              {loading && !answer && (
-                <p className="muted">Агент думает...</p>
-              )}
-              {!loading && !answer && <p className="muted">Нет ответа.</p>}
-              {answer && (
-                <>
-                  <p className="meta">
-                    Модель: {answer.model} • {answer.durationMs} мс
-                  </p>
-                  <p className="content">{answer.content}</p>
-                </>
-              )}
-            </article>
-          );
-        })}
-      </section>
-
-      <section className="card final">
-        <h2>Итоговый ответ</h2>
-        {loading && <p className="muted">Формирую итог...</p>}
-        {!loading && !finalAnswer && <p className="muted">Пока нет ответа.</p>}
-        {finalAnswer && (
-          <>
-            <p className="meta">
-              Модель: {finalAnswer.model} • {finalAnswer.durationMs} мс
-            </p>
-            <p className="content">{finalAnswer.content}</p>
-          </>
-        )}
-        {webSources && webSources.results.length > 0 && (
-          <div className="sources">
-            <h3>Веб-источники</h3>
-            <ul>
-              {webSources.results.map((s, i) => (
-                <li key={i}>
-                  <button
-                    type="button"
-                    className="source-link"
-                    onClick={() => window.api.openExternal(s.url)}
-                  >
-                    {s.title || s.url}
-                  </button>
-                  {s.snippet && <span className="source-snippet">{s.snippet.slice(0, 120)}…</span>}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
+      </main>
     </div>
   );
 }

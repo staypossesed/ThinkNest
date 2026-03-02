@@ -7,6 +7,10 @@ export interface AskRequest {
   useWebData?: boolean;
   /** Forecast mode: scenarios + confidence */
   forecastMode?: boolean;
+  /** Язык ответа: ru | en | zh (ручной выбор или из профиля) */
+  preferredLocale?: "ru" | "en" | "zh";
+  /** Base64 data URIs (data:image/png;base64,...) для распознавания картинок */
+  images?: string[];
 }
 
 export interface WebSource {
@@ -47,6 +51,8 @@ export interface UserProfile {
   email: string;
   fullName: string | null;
   avatarUrl: string | null;
+  /** Язык из Google-аккаунта, напр. "ru", "en" */
+  locale?: string;
 }
 
 export interface Entitlements {
@@ -73,4 +79,26 @@ export interface ConsumeUsageResponse {
 export interface SessionState {
   token: string | null;
   user: UserProfile | null;
+}
+
+/** Один обмен в чате: вопрос пользователя + ответ агентов */
+export interface ConversationMessage {
+  id: string;
+  question: string;
+  timestamp: number;
+  answers: AgentAnswer[];
+  final: AskResponse["final"] | null;
+  webSources?: AskResponseSources | null;
+  useWebData?: boolean;
+  forecastMode?: boolean;
+  /** Base64 data URIs для отображения прикреплённых картинок */
+  images?: string[];
+}
+
+/** Чат — список сообщений */
+export interface Conversation {
+  id: string;
+  messages: ConversationMessage[];
+  createdAt: number;
+  updatedAt: number;
 }
