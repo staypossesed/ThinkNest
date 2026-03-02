@@ -6,16 +6,26 @@ backend/node_modules/
 dist/
 backend/dist/
 
-# env and secrets
+# env and secrets (НИКОГДА не коммитить!)
 .env
 .env.local
 .env.*.local
+.env.development
+.env.production
 backend/.env
 backend/.env.local
+*.pem
+*.key
 
-# logs
+# приватные промпты (идея/логика — не для копирования)
+src/main/prompts.private.ts
+prompts.private.ts
+
+# debug logs
 *.log
+debug-*.log
 npm-debug.log*
+eval-*-report*.json
 
 # OS/editor
 .DS_Store

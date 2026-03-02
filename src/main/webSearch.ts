@@ -1,6 +1,3 @@
-import path from "node:path";
-import fs from "node:fs";
-
 /** Web search results for agents (DuckDuckGo, no API key) */
 export interface WebSearchResult {
   title: string;
@@ -8,37 +5,9 @@ export interface WebSearchResult {
   snippet: string;
 }
 
-// #region agent log
-const LOG_PATH = path.join(process.cwd(), "debug-9fc818.log");
-function _dbg(loc: string, msg: string, data: Record<string, unknown>, hid?: string): void {
-  const line =
-    JSON.stringify({
-      sessionId: "9fc818",
-      location: loc,
-      message: msg,
-      data,
-      timestamp: Date.now(),
-      ...(hid && { hypothesisId: hid })
-    }) + "\n";
-  try {
-    fs.appendFileSync(LOG_PATH, line);
-  } catch {
-    /* ignore */
-  }
-  fetch("http://127.0.0.1:7242/ingest/26359c5b-fac8-434d-b645-41992c754928", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "9fc818" },
-    body: JSON.stringify({
-      sessionId: "9fc818",
-      location: loc,
-      message: msg,
-      data,
-      timestamp: Date.now(),
-      ...(hid && { hypothesisId: hid })
-    })
-  }).catch(() => {});
+function _dbg(_loc: string, _msg: string, _data: Record<string, unknown>, _hid?: string): void {
+  /* no-op */
 }
-// #endregion
 
 const MAX_RESULTS_PER_QUERY = 5;
 const MAX_TOTAL = 12;
@@ -74,29 +43,60 @@ function normalizeQuery(input: string): string {
     .slice(0, 140);
 }
 
+/** Дополнительные поисковые запросы для мульти-сущностей (биткоин и солана и т.д.). */
+function getSupplementaryQueries(mainQuery: string): string[] {
+  const lower = mainQuery.toLowerCase();
+  const extra: string[] = [];
+  if ((/биткоин|bitcoin|btc/i.test(lower) && /солана|solana|sol/i.test(lower)) ||
+      (/эфир|ethereum|eth/i.test(lower) && /солана|solana|sol/i.test(lower))) {
+    extra.push("Solana price SOL курс");
+  }
+  return extra;
+}
+
 /** Универсальный поиск: Google (SerpAPI/Serper) -> Wikipedia -> DDG. Один поток для любых запросов. */
 export async function searchWeb(queries: string[]): Promise<WebSearchResult[]> {
   if (queries.length === 0) return [];
   const raw = normalizeQuery((queries[0] || "").trim());
+  const supplementary = getSupplementaryQueries(raw);
+  const allQueries = [raw, ...supplementary];
   // #region agent log
-  _dbg("webSearch.ts:searchWeb:entry", "searchWeb called", { queriesCount: queries.length, raw }, "H1");
+  _dbg("webSearch.ts:searchWeb:entry", "searchWeb called", { queriesCount: allQueries.length, raw, supplementary }, "H1");
   // #endregion
 
-  // 1) Google (приоритет): SerpAPI или Serper — для любых запросов
-  const googleResults = await searchGoogle([raw]);
-  if (googleResults.length > 0) return googleResults;
+  const dedupe = (arr: WebSearchResult[]): WebSearchResult[] =>
+    arr.filter((r, i, a) => {
+      const url = (r.url || "").toLowerCase();
+      return url && a.findIndex((x) => (x.url || "").toLowerCase() === url) === i;
+    });
 
-  // 2) Wikipedia — универсальный поиск. Для русских запросов: fallback на английский
+  // 1) Google — основной + доп. запросы для мульти-сущностей (биткоин и солана)
+  let results: WebSearchResult[] = [];
+  for (const q of allQueries) {
+    const part = await searchGoogle([q]);
+    results = dedupe([...results, ...part]);
+  }
+  if (results.length > 0) return results.slice(0, MAX_TOTAL);
+
+  // 2) Wikipedia
   let wikiResults = await searchWikipediaFallback([raw]);
   if (wikiResults.length === 0 && /[\u0400-\u04FF]/.test(raw)) {
     const enQuery = await translateToEnglish(raw);
     if (enQuery) wikiResults = await searchWikipediaFallback([enQuery]);
   }
-  if (wikiResults.length > 0) return wikiResults;
+  for (const q of supplementary) {
+    const extra = await searchWikipediaFallback([q]);
+    wikiResults = dedupe([...wikiResults, ...extra]);
+  }
+  if (wikiResults.length > 0) return wikiResults.slice(0, MAX_TOTAL);
 
   // 3) DuckDuckGo
-  const ddgInstant = await searchDuckDuckGoInstantFallback([raw], false);
-  if (ddgInstant.length > 0) return ddgInstant;
+  let ddgResults = await searchDuckDuckGoInstantFallback([raw], false);
+  for (const q of supplementary) {
+    const extra = await searchDuckDuckGoInstantFallback([q], false);
+    ddgResults = dedupe([...ddgResults, ...extra]);
+  }
+  if (ddgResults.length > 0) return ddgResults.slice(0, MAX_TOTAL);
 
   return [];
 }

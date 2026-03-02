@@ -1,6 +1,8 @@
 # Multi Agent Desktop (Free/Pro MVP)
 
 Desktop-приложение на Electron + React с 4 AI-агентами и итоговым агрегатором.
+
+> **Публикация репо:** см. [PUBLISHING.md](./PUBLISHING.md) — как сделать репо публичным без утечки секретов.
 Поддерживает:
 - Google login
 - Free/Pro тарифы
