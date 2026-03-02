@@ -7,7 +7,7 @@ export interface WebSearchResult {
 
 const MAX_RESULTS_PER_QUERY = 5;
 const MAX_TOTAL = 12;
-const SNIPPET_LEN = 400;
+const SNIPPET_LEN = 500;
 
 async function searchSingle(
   ddg: { text: (q: string) => AsyncIterable<{ title: string; href: string; body: string }> },
@@ -23,8 +23,9 @@ async function searchSingle(
   return results;
 }
 
-/** Deep Research: multiple queries for better coverage */
-export async function searchWeb(question: string): Promise<WebSearchResult[]> {
+/** Search using multiple queries, deduplicate by URL */
+export async function searchWeb(queries: string[]): Promise<WebSearchResult[]> {
+  if (queries.length === 0) return [];
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const ddg = require("duckduckgo-search") as {
@@ -32,18 +33,6 @@ export async function searchWeb(question: string): Promise<WebSearchResult[]> {
     };
     const seen = new Set<string>();
     const all: WebSearchResult[] = [];
-    const queries = [question];
-    const short = question.replace(/\s+/g, " ").slice(0, 80);
-    if (short !== question) queries.push(short);
-    const words = question.split(/\s+/).filter((w) => w.length > 2).slice(0, 4);
-    if (words.length >= 2) queries.push(words.join(" "));
-    if (/\b(картошк|картофел)\b/i.test(question) && /\b(росси|рф)\b/i.test(question)) {
-      queries.push("Петр I картофель Россия");
-    }
-    if (/\b(кто|когда|зачем)\s+(привёз|завёз|привез|завез)/i.test(question) && /\b(росси|рф)\b/i.test(question)) {
-      const topic = question.replace(/\b(кто|когда|зачем|привёз|завёз|привез|завез|в|россию|рф)\b/gi, "").trim().slice(0, 30);
-      if (topic) queries.push(`${topic} Россия история`);
-    }
     for (const q of queries) {
       if (all.length >= MAX_TOTAL) break;
       const batch = await searchSingle(ddg, q);
@@ -67,5 +56,8 @@ export function formatWebContext(results: WebSearchResult[]): string {
     const snip = (r.snippet || "").slice(0, SNIPPET_LEN);
     return `[${i + 1}] ${r.title}\n    URL: ${r.url}\n    ${snip}`;
   });
-  return "Данные из веба (ОБЯЗАТЕЛЬНО используй при ответе, не выдумывай факты):\n" + lines.join("\n\n");
+  return (
+    "Ключевые данные из поиска (используй в первую очередь). При противоречиях между источниками — укажи разные версии:\n" +
+    lines.join("\n\n")
+  );
 }

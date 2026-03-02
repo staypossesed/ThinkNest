@@ -10,6 +10,7 @@ import {
 import { chatCompletion } from "./ollama";
 import { ollamaConfig } from "./config";
 import { searchWeb, formatWebContext } from "./webSearch";
+import { generateSearchQueries, getFallbackQueries } from "./queryGenerator";
 
 function getCurrentContext(): string {
   const now = new Date();
@@ -126,48 +127,44 @@ export async function askQuestion(
   let webSources: WebSource[] = [];
   let webContext = "";
   if (useWebData) {
-    const results = await searchWeb(question);
-    const dateRelated =
-      /\b(дата|день|число|время|сегодня|сейчас|текущ|календар|какой\s+день)\b/i.test(
-        question
-      );
-    let extraResults: Awaited<ReturnType<typeof searchWeb>> = [];
-    if (dateRelated) {
-      extraResults = await searchWeb("текущая дата сегодня");
-    }
-    const allResults = [...results];
-    for (const r of extraResults) {
-      if (allResults.length >= 12) break;
-      if (!allResults.some((x) => x.url === r.url)) allResults.push(r);
-    }
-    webSources = allResults.map((r) => ({
+    let queries = await generateSearchQueries(question);
+    if (queries.length === 0) queries = getFallbackQueries(question);
+    const results = await searchWeb(queries);
+    webSources = results.map((r) => ({
       title: r.title,
       url: r.url,
       snippet: r.snippet
     }));
-    webContext = formatWebContext(allResults);
+    webContext = formatWebContext(results);
   }
 
   const currentContext = getCurrentContext();
 
+  const isFactualMode = webContext && !forecastMode;
   const webInstruction = webContext
-    ? "\n\n[КРИТИЧНО] Данные из веба — ЕДИНСТВЕННЫЙ источник фактов. Используй ТОЛЬКО то, что в вебе. " +
-      "Не выдумывай имён, дат, событий. Если в источниках нет — скажи «в найденных источниках не указано»."
+    ? isFactualMode
+      ? "\n\n[ФАКТИЧЕСКИЙ РЕЖИМ] Данные из веба — ЕДИНСТВЕННЫЙ источник фактов. Используй ТОЛЬКО их. " +
+        "На вопрос кто/когда/где/почему — ответ только из веба. Не выдумывай имён, дат, событий. " +
+        "Если в вебе противоречия — укажи несколько версий и источники. Если нет — «в источниках не указано»."
+      : "\n\n[РЕЖИМ ПРОГНОЗА] Планировщик может давать прогнозы и допущения. Остальные — опирайся на веб, можешь дополнять разумными допущениями."
     : "\n\nКогда фактов нет — допускай, предполагай. Для прогнозов — фантазируй.";
   const focusInstruction =
     "\n\nОтвечай СТРОГО на вопрос. Грамотный русский. Без несуществующих слов.";
 
-  const agentProfiles = baseAgentProfiles.map((a) => ({
-    ...a,
-    systemPrompt:
-      SYSTEM_OVERRIDE +
-      freedomInstruction +
-      webInstruction +
-      focusInstruction +
-      "\n\n" +
-      a.systemPrompt +
-      (forecastMode ? forecastSystemSuffix : "")
-  }));
+  const agentProfiles = baseAgentProfiles.map((a) => {
+    const forecastSuffix = forecastMode && a.id === "planner" ? forecastSystemSuffix : "";
+    return {
+      ...a,
+      systemPrompt:
+        SYSTEM_OVERRIDE +
+        freedomInstruction +
+        webInstruction +
+        focusInstruction +
+        "\n\n" +
+        a.systemPrompt +
+        forecastSuffix
+    };
+  });
 
   const maxAgents = Math.max(1, Math.min(4, request.maxAgents ?? 4));
   const activeAgents = agentProfiles.slice(0, maxAgents);
@@ -224,11 +221,17 @@ export async function askQuestion(
     : await Promise.all(activeAgents.map(runAgent));
 
   const aggStart = performance.now();
+  const judgeModeHint = isFactualMode
+    ? "При фактическом вопросе предпочитай ответ с опорой на источники, без выдуманных фактов. "
+    : forecastMode
+      ? "При прогнозе можно выбрать ответ с разумными допущениями. "
+      : "";
   const aggSystem =
     SYSTEM_OVERRIDE +
     "\n\n" +
     "Ты судья соревнования. У тебя ответы от 4 агентов на один вопрос. " +
     "Твоя задача: выбрать ОДИН лучший ответ. Не объединяй, не переписывай — выбери победителя. " +
+    judgeModeHint +
     "Игнорируй ответы с текстом 'Ошибка агента'. " +
     "Ответь СТРОГО в формате (две строки):\nПОБЕДИТЕЛЬ: [planner|critic|pragmatist|explainer]\nПРИЧИНА: [кратко почему этот ответ лучший]";
 
