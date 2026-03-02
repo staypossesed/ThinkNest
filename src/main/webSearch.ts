@@ -53,10 +53,18 @@ function isPresidentUSAQuery(input: string): boolean {
 function normalizeQuery(input: string): string {
   return input
     .replace(/\[test\s*\d+\]/gi, " ")
+    .replace(/\bща\b/gi, "сейчас")
+    .replace(/\bщас\b/gi, "сейчас")
     .replace(/[^\p{L}\p{N}\s\-?]/gu, " ")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 140);
+}
+
+function isChancellorGermanyQuery(input: string): boolean {
+  return /канцлер.*германи|германи.*канцлер|chancellor.*germany|germany.*chancellor/i.test(
+    input.toLowerCase()
+  );
 }
 
 /** Search using provider chain: Google (SerpAPI) -> Wikipedia/Wikidata -> DDG Instant API. */
@@ -73,7 +81,7 @@ export async function searchWeb(queries: string[]): Promise<WebSearchResult[]> {
   );
   // #endregion
 
-  const googleResults = await searchGoogleSerpApi(queries);
+  const googleResults = await searchGoogleSerpApi([raw]);
   if (googleResults.length > 0) return googleResults;
 
   if (isPresidentUSA) {
@@ -83,7 +91,7 @@ export async function searchWeb(queries: string[]): Promise<WebSearchResult[]> {
     if (merged.length > 0) return merged.slice(0, MAX_TOTAL);
   }
 
-  const wikiResults = await searchWikipediaFallback(queries);
+  const wikiResults = await searchWikipediaFallback([raw]);
   if (wikiResults.length > 0) {
     if (!isPresidentUSA) return wikiResults;
     const factual = await searchCurrentUsPresidentFact();
@@ -322,9 +330,11 @@ async function searchWikipediaFallback(queries: string[]): Promise<WebSearchResu
     /президент.*сша|сша.*президент|president.*usa|usa.*president|president.*america/i.test(raw);
   const isPotatoRussia =
     /картошк|картофель|potato.*russia|russia.*potato/i.test(raw);
+  const isChancellorGermany = isChancellorGermanyQuery(raw);
   let wikiQuery = raw;
   if (isPresidentUSA) wikiQuery = "president of the United States current";
   else if (isPotatoRussia) wikiQuery = "potato Russia history";
+  else if (isChancellorGermany) wikiQuery = "Chancellor of Germany current";
   else if (/[\u0400-\u04FF]/.test(raw)) wikiQuery = raw || "president of the United States current";
   if (!wikiQuery) wikiQuery = "president of the United States current";
   const q = encodeURIComponent(wikiQuery);
