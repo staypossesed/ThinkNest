@@ -44,12 +44,6 @@ const MAX_RESULTS_PER_QUERY = 5;
 const MAX_TOTAL = 12;
 const SNIPPET_LEN = 500;
 
-function isPresidentUSAQuery(input: string): boolean {
-  return /президент.*сша|сша.*президент|president.*usa|usa.*president|president.*united states/i.test(
-    input.toLowerCase()
-  );
-}
-
 function normalizeQuery(input: string): string {
   return input
     .replace(/\[test\s*\d+\]/gi, " ")
@@ -61,103 +55,27 @@ function normalizeQuery(input: string): string {
     .slice(0, 140);
 }
 
-function isChancellorGermanyQuery(input: string): boolean {
-  return /канцлер.*германи|германи.*канцлер|chancellor.*germany|germany.*chancellor/i.test(
-    input.toLowerCase()
-  );
-}
-
-/** Search using provider chain: Google (SerpAPI/Serper) -> direct facts -> Wikipedia -> DDG. */
+/** Универсальный поиск: Google (SerpAPI/Serper) -> Wikipedia -> DDG. Один поток для любых запросов. */
 export async function searchWeb(queries: string[]): Promise<WebSearchResult[]> {
   if (queries.length === 0) return [];
   const raw = normalizeQuery((queries[0] || "").trim());
-  const isPresidentUSA = isPresidentUSAQuery(raw);
-  const isChancellorDE = isChancellorGermanyQuery(raw);
   // #region agent log
-  _dbg(
-    "webSearch.ts:searchWeb:entry",
-    "searchWeb called",
-    { queriesCount: queries.length, queries, isPresidentUSA, isChancellorDE, cwd: process.cwd(), logPath: LOG_PATH },
-    "H1"
-  );
+  _dbg("webSearch.ts:searchWeb:entry", "searchWeb called", { queriesCount: queries.length, raw }, "H1");
   // #endregion
 
-  // 1) Google (приоритет): SerpAPI или Serper (2500 бесплатно/мес)
+  // 1) Google (приоритет): SerpAPI или Serper — для любых запросов
   const googleResults = await searchGoogle([raw]);
   if (googleResults.length > 0) return googleResults;
 
-  // 2) Прямые источники для частых запросов (без API)
-  if (isPresidentUSA) {
-    const official = await searchWhiteHousePresidentFact();
-    const factual = await searchCurrentUsPresidentFact();
-    const merged = [...official, ...factual];
-    if (merged.length > 0) return merged.slice(0, MAX_TOTAL);
-  }
-  if (isChancellorDE) {
-    const chancellor = await searchChancellorGermanyFact();
-    if (chancellor.length > 0) return chancellor;
-  }
-
-  // 3) Wikipedia + DDG
+  // 2) Wikipedia — универсальный поиск по запросу
   const wikiResults = await searchWikipediaFallback([raw]);
-  if (wikiResults.length > 0) {
-    if (!isPresidentUSA) return wikiResults;
-    const factual = await searchCurrentUsPresidentFact();
-    return factual.length > 0 ? [...factual, ...wikiResults].slice(0, MAX_TOTAL) : wikiResults;
-  }
+  if (wikiResults.length > 0) return wikiResults;
 
+  // 3) DuckDuckGo
   const ddgInstant = await searchDuckDuckGoInstantFallback([raw], false);
-  if (ddgInstant.length > 0) {
-    if (!isPresidentUSA) return ddgInstant;
-    const factual = await searchCurrentUsPresidentFact();
-    return factual.length > 0 ? [...factual, ...ddgInstant].slice(0, MAX_TOTAL) : ddgInstant;
-  }
+  if (ddgInstant.length > 0) return ddgInstant;
 
   return [];
-}
-
-/** Official source for current US president from whitehouse.gov. */
-async function searchWhiteHousePresidentFact(): Promise<WebSearchResult[]> {
-  try {
-    const res = await fetch("https://www.whitehouse.gov/administration/", {
-      signal: AbortSignal.timeout(9000)
-    });
-    // #region agent log
-    _dbg("webSearch.ts:whitehouse:status", "whitehouse status", { status: res.status }, "H18");
-    // #endregion
-    if (!res.ok) return [];
-    const html = await res.text();
-    const text = html
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    const m =
-      text.match(/President\s+Donald\s+J\.?\s+Trump/i) ||
-      text.match(/President\s+([A-Z][a-z]+(?:\s+[A-Z]\.)?\s+[A-Z][a-z]+)/);
-    const name = m?.[1] ? m[1] : m ? "Donald J. Trump" : "";
-    if (!name) return [];
-
-    const out: WebSearchResult[] = [
-      {
-        title: "Official White House Administration",
-        url: "https://www.whitehouse.gov/administration/",
-        snippet: `CURRENT PRESIDENT FACT: President of the United States is ${name}. Source: White House Administration page.`
-      }
-    ];
-    // #region agent log
-    _dbg("webSearch.ts:whitehouse:parsed", "whitehouse parsed", { name }, "H18");
-    // #endregion
-    return out;
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "unknown";
-    // #region agent log
-    _dbg("webSearch.ts:whitehouse:catch", "whitehouse failed", { msg }, "H18");
-    // #endregion
-    return [];
-  }
 }
 
 /** Google Search: SerpAPI (SERPAPI_KEY) или Serper (SERPER_API_KEY, 2500 бесплатно/мес). */
@@ -242,130 +160,6 @@ async function searchGoogleSerper(q: string, key: string): Promise<WebSearchResu
   }
 }
 
-/** Текущий канцлер Германии — Wikidata (P6 head of government для Q183). */
-async function searchChancellorGermanyFact(): Promise<WebSearchResult[]> {
-  const out: WebSearchResult[] = [];
-  try {
-    const sparql =
-      "SELECT ?person ?personLabel ?start WHERE { " +
-      "wd:Q183 p:P6 ?st. ?st ps:P6 ?person. OPTIONAL { ?st pq:P580 ?start } " +
-      "OPTIONAL { ?st pq:P582 ?end } FILTER(!BOUND(?end) || ?end > NOW()) " +
-      'SERVICE wikibase:label { bd:serviceParam wikibase:language "en,ru". } } ' +
-      "ORDER BY DESC(?start) LIMIT 1";
-    const url = `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(sparql)}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(9000) });
-    if (res.ok) {
-      const json = (await res.json()) as {
-        results?: { bindings?: Array<{ personLabel?: { value?: string }; start?: { value?: string } }> };
-      };
-      const first = json.results?.bindings?.[0];
-      const name = first?.personLabel?.value || "";
-      const start = first?.start?.value?.slice(0, 10) || "";
-      if (name) {
-        out.push({
-          title: "Wikidata: Chancellor of Germany",
-          url: "https://www.wikidata.org/wiki/Q4970706",
-          snippet: `CURRENT CHANCELLOR FACT: Chancellor of Germany is ${name}${start ? ` (since ${start})` : ""}. Source: Wikidata.`
-        });
-      }
-    }
-  } catch {
-    // ignore
-  }
-
-  try {
-    const url =
-      "https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1" +
-      "&titles=Chancellor_of_Germany&format=json&utf8=1";
-    const res = await fetch(url, { signal: AbortSignal.timeout(9000) });
-    if (res.ok) {
-      const json = (await res.json()) as {
-        query?: { pages?: Record<string, { title?: string; extract?: string }> };
-      };
-      const pages = Object.values(json.query?.pages || {});
-      const page = pages.find((p) => !!p.extract);
-      if (page?.extract && out.length > 0) {
-        const intro = page.extract.slice(0, 450);
-        if (/chancellor|канцлер|scholz|olaf/i.test(intro)) {
-          out.push({
-            title: page.title || "Chancellor of Germany",
-            url: "https://en.wikipedia.org/wiki/Chancellor_of_Germany",
-            snippet: intro
-          });
-        }
-      }
-    }
-  } catch {
-    // ignore
-  }
-  return out;
-}
-
-/** Adds a deterministic fact for "current US president" from Wikidata + Wikipedia extract. */
-async function searchCurrentUsPresidentFact(): Promise<WebSearchResult[]> {
-  const out: WebSearchResult[] = [];
-  try {
-    const sparql =
-      "SELECT ?person ?personLabel ?start WHERE { " +
-      "wd:Q30 p:P35 ?st. ?st ps:P35 ?person. OPTIONAL { ?st pq:P580 ?start } " +
-      "OPTIONAL { ?st pq:P582 ?end } FILTER(!BOUND(?end) || ?end > NOW()) " +
-      'SERVICE wikibase:label { bd:serviceParam wikibase:language "en". } } ' +
-      "ORDER BY DESC(?start) LIMIT 1";
-    const url = `https://query.wikidata.org/sparql?format=json&query=${encodeURIComponent(sparql)}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(9000) });
-    if (res.ok) {
-      const json = (await res.json()) as {
-        results?: { bindings?: Array<{ personLabel?: { value?: string }; start?: { value?: string } }> };
-      };
-      const first = json.results?.bindings?.[0];
-      const name = first?.personLabel?.value || "";
-      const start = first?.start?.value?.slice(0, 10) || "";
-      if (name) {
-        out.push({
-          title: "Wikidata: Head of state of the United States",
-          url: "https://www.wikidata.org/wiki/Q30",
-          snippet: `Current head of state of the United States: ${name}${start ? ` (since ${start})` : ""}.`
-        });
-      }
-    }
-  } catch {
-    // ignore
-  }
-
-  try {
-    const url =
-      "https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1" +
-      "&titles=President_of_the_United_States&format=json&utf8=1";
-    const res = await fetch(url, { signal: AbortSignal.timeout(9000) });
-    if (res.ok) {
-      const json = (await res.json()) as {
-        query?: { pages?: Record<string, { title?: string; extract?: string }> };
-      };
-      const pages = Object.values(json.query?.pages || {});
-      const page = pages.find((p) => !!p.extract);
-      if (page?.extract) {
-        out.push({
-          title: page.title || "President of the United States",
-          url: "https://en.wikipedia.org/wiki/President_of_the_United_States",
-          snippet: page.extract.slice(0, 450)
-        });
-      }
-    }
-  } catch {
-    // ignore
-  }
-
-  // #region agent log
-  _dbg(
-    "webSearch.ts:presidentFact",
-    "president fact results",
-    { results: out.length, hasTrump: /trump/i.test(JSON.stringify(out)) },
-    "H17"
-  );
-  // #endregion
-  return out;
-}
-
 /** Fallback #1: DuckDuckGo Instant Answer API (no vqd). */
 async function searchDuckDuckGoInstantFallback(
   queries: string[],
@@ -430,23 +224,13 @@ async function searchDuckDuckGoInstantFallback(
   }
 }
 
-/** Fallback #2: Wikipedia Search API (legacy api.php, more stable than rest.php). */
+/** Fallback #2: Wikipedia Search API — универсальный поиск по любому запросу. */
 async function searchWikipediaFallback(queries: string[]): Promise<WebSearchResult[]> {
-  const raw = normalizeQuery((queries[0] || "").trim().slice(0, 100)).toLowerCase();
-  const isPresidentUSA =
-    /президент.*сша|сша.*президент|president.*usa|usa.*president|president.*america/i.test(raw);
-  const isPotatoRussia =
-    /картошк|картофель|potato.*russia|russia.*potato/i.test(raw);
-  const isChancellorGermany = isChancellorGermanyQuery(raw);
-  let wikiQuery = raw;
-  if (isPresidentUSA) wikiQuery = "president of the United States current";
-  else if (isPotatoRussia) wikiQuery = "potato Russia history";
-  else if (isChancellorGermany) wikiQuery = "Chancellor of Germany current";
-  else if (/[\u0400-\u04FF]/.test(raw)) wikiQuery = raw || "president of the United States current";
-  if (!wikiQuery) wikiQuery = "president of the United States current";
+  const raw = normalizeQuery((queries[0] || "").trim().slice(0, 100));
+  const wikiQuery = raw || "search";
   const q = encodeURIComponent(wikiQuery);
   // #region agent log
-  _dbg("webSearch.ts:wikipediaFallback", "using Wikipedia", { raw: queries[0], wikiQuery }, "H6");
+  _dbg("webSearch.ts:wikipediaFallback", "using Wikipedia", { raw, wikiQuery }, "H6");
   // #endregion
   try {
     const url =
@@ -498,10 +282,8 @@ export function formatWebContext(results: WebSearchResult[]): string {
     return `[${i + 1}] ${r.title}\n    URL: ${r.url}\n    ${snip}`;
   });
   return (
-    "=== ИСТОЧНИКИ ИЗ ИНТЕРНЕТА (ТВОЙ ЕДИНСТВЕННЫЙ ИСТОЧНИК ФАКТОВ) ===\n" +
-    "Если есть 'CURRENT PRESIDENT FACT:' — используй БУКВАЛЬНО как ответ о президенте США.\n" +
-    "Если есть 'CURRENT CHANCELLOR FACT:' — используй БУКВАЛЬНО как ответ о канцлере Германии.\n" +
-    "ЗАПРЕЩЕНО выдумывать имена, даты, события. Используй ТОЛЬКО то, что написано ниже.\n" +
+    "=== ИСТОЧНИКИ ИЗ ИНТЕРНЕТА (ТВОЙ ИСТОЧНИК ФАКТОВ) ===\n" +
+    "Используй ТОЛЬКО факты из списка ниже. ЗАПРЕЩЕНО выдумывать имена, даты, события.\n" +
     "Перекрёстная проверка: если несколько источников совпадают — используй. Если противоречат — укажи обе версии.\n" +
     "НЕ называй людей, дат или событий, которых НЕТ в списке ниже.\n\n" +
     lines.join("\n\n")
