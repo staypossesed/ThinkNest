@@ -11,6 +11,21 @@ import { chatCompletion } from "./ollama";
 import { ollamaConfig } from "./config";
 import { searchWeb, formatWebContext } from "./webSearch";
 
+function getCurrentContext(): string {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("ru-RU", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  });
+  const timeStr = now.toLocaleTimeString("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+  return `[Текущий момент]: ${dateStr}, ${timeStr}.`;
+}
+
 const baseAgentProfiles: Array<{
   id: AgentId;
   title: string;
@@ -23,7 +38,10 @@ const baseAgentProfiles: Array<{
     title: "Планировщик",
     model: ollamaConfig.agents.planner,
     systemPrompt:
-      "Ты планировщик. Дай свою точку зрения: пошаговый план. Будь структурирован и лаконичен."
+      "Ты Планировщик — стратег, который видит всё в виде чётких шагов. Твой характер: методичный, любишь порядок и структуру. " +
+      "Ты ВСЕГДА отвечаешь на вопрос: дай пошаговый план, разбей на этапы. " +
+      "Ты ВСЕГДА используешь предоставленный контекст (дата, время, веб-данные) — если он есть, опирайся на него. " +
+      "Будь конкретным и лаконичным. Нумеруй шаги."
   },
   {
     id: "critic",
@@ -31,21 +49,32 @@ const baseAgentProfiles: Array<{
     model: ollamaConfig.agents.critic,
     numPredict: 400,
     systemPrompt:
-      "Ты критик. Дай свою точку зрения: риски, слабые места, подводные камни. Кратко, 3–5 пунктов."
+      "Ты Критик — скептик, который ищет слабые места и риски. Твой характер: требовательный, задаёшь неудобные вопросы. " +
+      "Ты ВСЕГДА отвечаешь на вопрос: дай риски, подводные камни, что может пойти не так. " +
+      "Ты ВСЕГДА используешь предоставленный контекст (дата, время, веб-данные) — если он есть, опирайся на него. " +
+      "Критикуй именно заданный вопрос, а не случайные темы. Кратко, 3–5 пунктов."
   },
   {
     id: "pragmatist",
     title: "Практик",
     model: ollamaConfig.agents.pragmatist,
     systemPrompt:
-      "Ты практик. Дай свою точку зрения: применимые шаги, что делать прямо сейчас. Без воды."
+      "Ты Практик — человек действия. Твой характер: без лишних слов, только дела. " +
+      "Ты даёшь этапы пути и действия, которые РЕАЛЬНО нужно пройти на практике. " +
+      "Каждый шаг — конкретный и выполнимый: что именно сделать, куда пойти, что нажать, что сказать, что купить. " +
+      "Не теория — только практика. Человек должен взять твой ответ и сразу начать действовать. " +
+      "Ты ВСЕГДА используешь предоставленный контекст (дата, время, веб-данные) — если он есть, опирайся на него. " +
+      "Нумеруй шаги. Без воды."
   },
   {
     id: "explainer",
     title: "Объяснитель",
     model: ollamaConfig.agents.explainer,
     systemPrompt:
-      "Ты объяснитель. Дай свою точку зрения: объясни простыми словами, чтобы было понятно любому."
+      "Ты Объяснитель — учитель, который объясняет простыми словами. Твой характер: терпеливый, понятный. " +
+      "Ты ВСЕГДА отвечаешь на вопрос: объясни так, чтобы понял любой человек. " +
+      "Ты ВСЕГДА используешь предоставленный контекст (дата, время, веб-данные) — если он есть, опирайся на него. " +
+      "Без жаргона. Кратко и ясно."
   }
 ];
 
@@ -97,13 +126,28 @@ export async function askQuestion(
   let webContext = "";
   if (useWebData) {
     const results = await searchWeb(question);
-    webSources = results.map((r) => ({
+    const dateRelated =
+      /\b(дата|день|число|время|сегодня|сейчас|текущ|календар|какой\s+день)\b/i.test(
+        question
+      );
+    let extraResults: Awaited<ReturnType<typeof searchWeb>> = [];
+    if (dateRelated) {
+      extraResults = await searchWeb("текущая дата сегодня");
+    }
+    const allResults = [...results];
+    for (const r of extraResults) {
+      if (allResults.length >= 12) break;
+      if (!allResults.some((x) => x.url === r.url)) allResults.push(r);
+    }
+    webSources = allResults.map((r) => ({
       title: r.title,
       url: r.url,
       snippet: r.snippet
     }));
-    webContext = formatWebContext(results);
+    webContext = formatWebContext(allResults);
   }
+
+  const currentContext = getCurrentContext();
 
   const agentProfiles = baseAgentProfiles.map((a) => ({
     ...a,
@@ -116,9 +160,10 @@ export async function askQuestion(
   const maxAgents = Math.max(1, Math.min(4, request.maxAgents ?? 4));
   const activeAgents = agentProfiles.slice(0, maxAgents);
 
-  const userContent = webContext
-    ? `${webContext}\n\n---\nВопрос: ${question}`
-    : question;
+  const userContent =
+    `${currentContext}\n\n` +
+    (webContext ? `${webContext}\n\n---\n` : "") +
+    `Вопрос: ${question}`;
 
   const runAgent = async (
     agent: (typeof agentProfiles)[number]
