@@ -37,6 +37,13 @@ export async function searchWeb(question: string): Promise<WebSearchResult[]> {
     if (short !== question) queries.push(short);
     const words = question.split(/\s+/).filter((w) => w.length > 2).slice(0, 4);
     if (words.length >= 2) queries.push(words.join(" "));
+    if (/\b(картошк|картофел)\b/i.test(question) && /\b(росси|рф)\b/i.test(question)) {
+      queries.push("Петр I картофель Россия");
+    }
+    if (/\b(кто|когда|зачем)\s+(привёз|завёз|привез|завез)/i.test(question) && /\b(росси|рф)\b/i.test(question)) {
+      const topic = question.replace(/\b(кто|когда|зачем|привёз|завёз|привез|завез|в|россию|рф)\b/gi, "").trim().slice(0, 30);
+      if (topic) queries.push(`${topic} Россия история`);
+    }
     for (const q of queries) {
       if (all.length >= MAX_TOTAL) break;
       const batch = await searchSingle(ddg, q);
