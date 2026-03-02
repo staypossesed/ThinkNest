@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AgentAnswer, AskResponse, Entitlements, SessionState } from "../shared/types";
+import logo from "./assets/logo.png";
 
 const agentOrder = ["planner", "critic", "pragmatist", "explainer"] as const;
 
@@ -175,7 +176,10 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>Multi Agent Desktop</h1>
+        <div className="header-brand">
+          <img src={logo} alt="" className="header-logo" />
+          <h1>Multi Agent Desktop</h1>
+        </div>
         <p>Free/Pro AI-помощник: 4 агента + лучший итоговый ответ.</p>
       </header>
 

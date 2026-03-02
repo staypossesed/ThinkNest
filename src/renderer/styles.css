@@ -40,8 +40,22 @@ body {
   margin-bottom: 32px;
 }
 
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.header-logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 .header h1 {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 2rem;
   font-weight: 700;
   letter-spacing: -0.02em;
