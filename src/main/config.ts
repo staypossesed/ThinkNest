@@ -8,9 +8,9 @@ export const ollamaConfig = {
   /** Модели — разные для 4 точек зрения */
   agents: {
     planner: "mistral",
-    critic: "phi3",
+    critic: "llama3.1",
     pragmatist: "qwen2.5",
-    explainer: "llama3.1"
+    explainer: "qwen2.5"
   },
   aggregatorModel: "llama3.1"
 };

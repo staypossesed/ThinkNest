@@ -1,7 +1,7 @@
 import { chatCompletion } from "./ollama";
 import { ollamaConfig } from "./config";
 
-const QUERY_MODEL = "phi3";
+const QUERY_MODEL = "qwen2.5";
 const QUERY_TIMEOUT_MS = 10000;
 
 /**
@@ -19,7 +19,8 @@ export async function generateSearchQueries(question: string): Promise<string[]>
         {
           role: "system",
           content:
-            "Ты помощник. Из вопроса пользователя выдели 2-3 коротких поисковых запроса (3-6 слов каждый) для поиска ответа в интернете. " +
+            "Ты помощник. Из вопроса пользователя выдели 2-3 коротких поисковых запроса для поиска в интернете. " +
+            "Включи ключевые слова: имена, даты, места. Пример: «кто привез картошку в Россию» → «картофель Россия история», «Петр I картофель». " +
             "Ответь ТОЛЬКО запросами через запятую, без нумерации и пояснений."
         },
         { role: "user", content: question }

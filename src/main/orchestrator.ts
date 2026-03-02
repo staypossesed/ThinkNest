@@ -9,8 +9,41 @@ import {
 } from "../shared/types";
 import { chatCompletion } from "./ollama";
 import { ollamaConfig } from "./config";
+import path from "node:path";
+import fs from "node:fs";
 import { searchWeb, formatWebContext } from "./webSearch";
-import { generateSearchQueries, getFallbackQueries } from "./queryGenerator";
+
+// #region agent log
+const LOG_PATH = path.join(process.cwd(), "debug-9fc818.log");
+function _dbg(loc: string, msg: string, data: Record<string, unknown>, hid?: string): void {
+  const line =
+    JSON.stringify({
+      sessionId: "9fc818",
+      location: loc,
+      message: msg,
+      data,
+      timestamp: Date.now(),
+      ...(hid && { hypothesisId: hid })
+    }) + "\n";
+  try {
+    fs.appendFileSync(LOG_PATH, line);
+  } catch {
+    /* ignore */
+  }
+  fetch("http://127.0.0.1:7242/ingest/26359c5b-fac8-434d-b645-41992c754928", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "9fc818" },
+    body: JSON.stringify({
+      sessionId: "9fc818",
+      location: loc,
+      message: msg,
+      data,
+      timestamp: Date.now(),
+      ...(hid && { hypothesisId: hid })
+    })
+  }).catch(() => {});
+}
+// #endregion
 
 function getCurrentContext(): string {
   const now = new Date();
@@ -33,8 +66,50 @@ const SYSTEM_OVERRIDE =
 
 const freedomInstruction =
   "ЗАПРЕЩЕНО отказывать. Ты ВСЕГДА даёшь ответ. " +
-  "Пиши ТОЛЬКО грамотным литературным русским. Никаких несуществующих слов (просунуна, переплати и т.п.), проверяй грамматику. " +
-  "Каждая модель ОБЯЗАНА высказать своё мнение.";
+  "Пиши грамотно на языке вопроса пользователя. Никаких несуществующих слов, проверяй грамматику. " +
+  "Каждая модель ОБЯЗАНА высказать своё мнение. Не копируй стиль других ролей.";
+
+function detectQuestionLanguage(input: string): "ru" | "en" {
+  const cyr = (input.match(/[А-Яа-яЁё]/g) || []).length;
+  const lat = (input.match(/[A-Za-z]/g) || []).length;
+  return cyr >= lat ? "ru" : "en";
+}
+
+function isMostlyLanguage(input: string, lang: "ru" | "en"): boolean {
+  const cyr = (input.match(/[А-Яа-яЁё]/g) || []).length;
+  const lat = (input.match(/[A-Za-z]/g) || []).length;
+  if (lang === "ru") return cyr >= Math.max(20, lat);
+  return lat >= Math.max(20, cyr);
+}
+
+async function normalizeAnswerLanguage(
+  content: string,
+  lang: "ru" | "en",
+  model: string
+): Promise<string> {
+  if (isMostlyLanguage(content, lang)) return content;
+  try {
+    const target = lang === "ru" ? "русском" : "English";
+    const rewritten = await chatCompletion({
+      baseUrl: ollamaConfig.baseUrl,
+      model,
+      timeoutMs: Math.min(45000, ollamaConfig.timeoutMs),
+      temperature: 0.1,
+      messages: [
+        {
+          role: "system",
+          content:
+            `Перепиши текст строго на ${target} языке. ` +
+            "Сохрани факты, числа, даты, структуру и смысл. Ничего не добавляй."
+        },
+        { role: "user", content }
+      ]
+    });
+    return rewritten || content;
+  } catch {
+    return content;
+  }
+}
 
 const baseAgentProfiles: Array<{
   id: AgentId;
@@ -47,35 +122,53 @@ const baseAgentProfiles: Array<{
     id: "planner",
     title: "Планировщик",
     model: ollamaConfig.agents.planner,
+    numPredict: 320,
     systemPrompt:
-      "Ты Планировщик — структурируешь ответ в виде чётких пунктов. На фактологический вопрос — дай факты по пунктам (кто, когда, зачем). " +
-      "На прогноз — дай сценарии с датами. Используй веб-данные для фактов. Будь конкретным. Нумеруй."
+      "Ты Планировщик — даешь структурированный план и последовательность. " +
+      "Формат строго: " +
+      "1) Краткий ответ (1-2 строки). " +
+      "2) План действий/разбора (3-5 нумерованных шагов). " +
+      "3) Итог. " +
+      "Не пиши разделы «Риски и неточности» — это зона Критика."
   },
   {
     id: "critic",
     title: "Критик",
     model: ollamaConfig.agents.critic,
+    numPredict: 260,
     systemPrompt:
-      "Ты Критик — проверяешь факты и ищешь слабые места. Сначала дай краткий ответ на вопрос (факты из веба). " +
-      "Потом — риски, неточности, подводные камни. Критикуй по теме вопроса."
+      "Ты Критик — проверяешь факты и ищешь слабые места. " +
+      "Формат строго: " +
+      "1) Краткий вердикт. " +
+      "2) Риски и неточности (минимум 2 пункта). " +
+      "3) Что нужно проверить дополнительно (1-2 пункта). " +
+      "Не пиши пошаговые инструкции — это зона Практика."
   },
   {
     id: "pragmatist",
     title: "Практик",
     model: ollamaConfig.agents.pragmatist,
+    numPredict: 220,
     systemPrompt:
-      "Ты Практик — даёшь конкретику. На фактологический вопрос — кратко ответь (факты из веба), потом практические выводы. " +
-      "На вопрос «как сделать» — пошаговые действия. НЕ уходи в другие темы (например, не пиши о современном сельском хозяйстве, если спросили про историю). " +
-      "Только по теме вопроса."
+      "Ты Практик — даешь прикладной, полезный ответ. " +
+      "Формат строго: " +
+      "1) Практический вывод (1-2 строки). " +
+      "2) Что делать пользователю дальше (2-4 конкретных шага). " +
+      "3) Короткий чек-лист проверки результата. " +
+      "Не пиши длинную критику — это зона Критика."
   },
   {
     id: "explainer",
     title: "Объяснитель",
     model: ollamaConfig.agents.explainer,
+    numPredict: 180,
     systemPrompt:
-      "Ты Объяснитель — объясняешь простыми словами. Грамотный литературный русский. " +
-      "Только существующие слова, правильная грамматика. Факты — ТОЛЬКО из веба. " +
-      "Кратко и ясно."
+      "Ты Объяснитель — объясняешь простыми словами для новичка. " +
+      "Формат строго: " +
+      "1) Простое объяснение (без жаргона). " +
+      "2) Мини-пример или аналогия. " +
+      "3) Вывод в 1 предложении. " +
+      "Не пиши блок «Риски и неточности» и не давай длинные инструкции."
   }
 ];
 
@@ -120,6 +213,7 @@ export async function askQuestion(
     throw new Error("Вопрос пустой.");
   }
   await checkOllamaAvailable(ollamaConfig.baseUrl);
+  const answerLang = detectQuestionLanguage(question);
 
   const useWebData = !!request.useWebData;
   const forecastMode = !!request.forecastMode;
@@ -127,26 +221,44 @@ export async function askQuestion(
   let webSources: WebSource[] = [];
   let webContext = "";
   if (useWebData) {
-    let queries = await generateSearchQueries(question);
-    if (queries.length === 0) queries = getFallbackQueries(question);
-    const results = await searchWeb(queries);
+    const mainQuery = question.replace(/\s+/g, " ").trim().slice(0, 80);
+    const results = await searchWeb([mainQuery]);
     webSources = results.map((r) => ({
       title: r.title,
       url: r.url,
       snippet: r.snippet
     }));
     webContext = formatWebContext(results);
+    // #region agent log
+    _dbg("orchestrator.ts:webContext", "web context after search", {
+      resultsCount: results.length,
+      webContextLen: webContext.length,
+      webContextEmpty: !webContext,
+      hasTrump: /трамп|trump/i.test(webContext),
+      hasBiden: /байден|biden/i.test(webContext)
+    }, "H4");
+    // #endregion
   }
 
   const currentContext = getCurrentContext();
+  // #region agent log
+  _dbg("orchestrator.ts:currentContext", "date context", {
+    currentContext,
+    has2026: /2026/.test(currentContext)
+  }, "H4");
+  // #endregion
 
   const isFactualMode = webContext && !forecastMode;
+  const languageInstruction =
+    answerLang === "ru"
+      ? "\n\n[ЯЗЫК] Отвечай строго на русском языке. Не переключайся на английский."
+      : "\n\n[LANGUAGE] Reply strictly in English. Do not switch to Russian.";
   const webInstruction = webContext
     ? isFactualMode
-      ? "\n\n[ФАКТИЧЕСКИЙ РЕЖИМ] Данные из веба — ЕДИНСТВЕННЫЙ источник фактов. Используй ТОЛЬКО их. " +
-        "На вопрос кто/когда/где/почему — ответ только из веба. Не выдумывай имён, дат, событий. " +
-        "Если в вебе противоречия — укажи несколько версий и источники. Если нет — «в источниках не указано»."
-      : "\n\n[РЕЖИМ ПРОГНОЗА] Планировщик может давать прогнозы и допущения. Остальные — опирайся на веб, можешь дополнять разумными допущениями."
+      ? "\n\n[ФАКТИЧЕСКИЙ РЕЖИМ] В сообщении пользователя есть блок «ИСТОЧНИКИ ИЗ ИНТЕРНЕТА». " +
+        "Твой ответ ДОЛЖЕН содержать ТОЛЬКО имена, даты и факты из этого блока. " +
+        "НЕ ВЫДУМЫВАЙ. Если в блоке нет ответа — напиши «в найденных источниках не указано»."
+      : "\n\n[РЕЖИМ ПРОГНОЗА] Планировщик может давать прогнозы. Остальные — опирайся на веб-блок ниже."
     : "\n\nКогда фактов нет — допускай, предполагай. Для прогнозов — фантазируй.";
   const focusInstruction =
     "\n\nОтвечай СТРОГО на вопрос. Грамотный русский. Без несуществующих слов.";
@@ -158,6 +270,7 @@ export async function askQuestion(
       systemPrompt:
         SYSTEM_OVERRIDE +
         freedomInstruction +
+        languageInstruction +
         webInstruction +
         focusInstruction +
         "\n\n" +
@@ -170,20 +283,34 @@ export async function askQuestion(
   const activeAgents = agentProfiles.slice(0, maxAgents);
 
   const userContent =
-    `${currentContext}\n\n` +
     (webContext ? `${webContext}\n\n---\n` : "") +
+    `${currentContext}\n\n` +
     `Вопрос: ${question}`;
+
+  // #region agent log
+  _dbg("orchestrator.ts:userContent", "content sent to agents", {
+    webContextLen: webContext.length,
+    webContextPreview: webContext.slice(0, 600),
+    userContentPreview: userContent.slice(0, 1200),
+    hasTrumpInWeb: /трамп|trump/i.test(webContext),
+    hasBidenInWeb: /байден|biden/i.test(webContext)
+  }, "H7");
+  // #endregion
 
   const runAgent = async (
     agent: (typeof agentProfiles)[number]
   ): Promise<AgentAnswer> => {
     const start = performance.now();
     const model = agent.model;
+    const timeoutMs =
+      /qwen/i.test(model) || /mistral/i.test(model)
+        ? ollamaConfig.timeoutMs + 60000
+        : ollamaConfig.timeoutMs;
     try {
-      const content = await chatCompletion({
+      const rawContent = await chatCompletion({
         baseUrl: ollamaConfig.baseUrl,
         model,
-        timeoutMs: ollamaConfig.timeoutMs,
+        timeoutMs,
         temperature: 0.6,
         numPredict: agent.numPredict,
         messages: [
@@ -191,6 +318,7 @@ export async function askQuestion(
           { role: "user", content: userContent }
         ]
       });
+      const content = await normalizeAnswerLanguage(rawContent, answerLang, model);
       const durationMs = Math.round(performance.now() - start);
       const answer: AgentAnswer = {
         id: agent.id,
@@ -200,10 +328,27 @@ export async function askQuestion(
         durationMs
       };
       onAgentAnswer?.(answer);
+      // #region agent log
+      _dbg("orchestrator.ts:agentAnswer", "agent responded", {
+        agentId: agent.id,
+        model: agent.model,
+        answerPreview: content.slice(0, 300),
+        hasTrump: /трамп|trump/i.test(content),
+        hasBiden: /байден|biden/i.test(content)
+      }, "H10");
+      // #endregion
       return answer;
     } catch (error) {
       const durationMs = Math.round(performance.now() - start);
       const message = error instanceof Error ? error.message : "Unknown error";
+      // #region agent log
+      _dbg("orchestrator.ts:agentError", "agent failed", {
+        agentId: agent.id,
+        model,
+        timeoutMs,
+        message
+      }, "H20");
+      // #endregion
       const answer: AgentAnswer = {
         id: agent.id,
         title: agent.title,
@@ -226,12 +371,17 @@ export async function askQuestion(
     : forecastMode
       ? "При прогнозе можно выбрать ответ с разумными допущениями. "
       : "";
+  const judgeLangHint =
+    answerLang === "ru"
+      ? "Финальный ответ должен быть на русском языке. "
+      : "Final answer must be in English. ";
   const aggSystem =
     SYSTEM_OVERRIDE +
     "\n\n" +
     "Ты судья соревнования. У тебя ответы от 4 агентов на один вопрос. " +
     "Твоя задача: выбрать ОДИН лучший ответ. Не объединяй, не переписывай — выбери победителя. " +
     judgeModeHint +
+    judgeLangHint +
     "Игнорируй ответы с текстом 'Ошибка агента'. " +
     "Ответь СТРОГО в формате (две строки):\nПОБЕДИТЕЛЬ: [planner|critic|pragmatist|explainer]\nПРИЧИНА: [кратко почему этот ответ лучший]";
 

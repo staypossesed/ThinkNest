@@ -24,7 +24,7 @@
   "type": "commonjs",
   "dependencies": {
     "dotenv": "^17.3.1",
-    "duckduckgo-search": "^1.0.7",
+    "duck-duck-scrape": "^2.2.7",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
