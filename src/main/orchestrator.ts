@@ -7,43 +7,15 @@ import {
   OnAgentAnswer,
   WebSource
 } from "../shared/types";
-import { chatCompletion } from "./ollama";
+import { chatCompletion, visionChatCompletion } from "./ollama";
 import { ollamaConfig } from "./config";
-import path from "node:path";
-import fs from "node:fs";
 import { searchWeb, formatWebContext } from "./webSearch";
+import { getPrompts } from "./prompts.config";
 
-// #region agent log
-const LOG_PATH = path.join(process.cwd(), "debug-9fc818.log");
-function _dbg(loc: string, msg: string, data: Record<string, unknown>, hid?: string): void {
-  const line =
-    JSON.stringify({
-      sessionId: "9fc818",
-      location: loc,
-      message: msg,
-      data,
-      timestamp: Date.now(),
-      ...(hid && { hypothesisId: hid })
-    }) + "\n";
-  try {
-    fs.appendFileSync(LOG_PATH, line);
-  } catch {
-    /* ignore */
-  }
-  fetch("http://127.0.0.1:7242/ingest/26359c5b-fac8-434d-b645-41992c754928", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "9fc818" },
-    body: JSON.stringify({
-      sessionId: "9fc818",
-      location: loc,
-      message: msg,
-      data,
-      timestamp: Date.now(),
-      ...(hid && { hypothesisId: hid })
-    })
-  }).catch(() => {});
+// Debug: no-op для публичного репо (включать только локально при отладке)
+function _dbg(_loc: string, _msg: string, _data: Record<string, unknown>, _hid?: string): void {
+  /* no-op */
 }
-// #endregion
 
 function getCurrentContext(): string {
   const now = new Date();
@@ -106,116 +78,91 @@ function hasForeignScriptNoise(input: string, lang: "ru" | "en"): boolean {
   const hasCyr = /[А-Яа-яЁё]/.test(input);
   const hasLat = /[A-Za-z]/.test(input);
   if (hasCjk || hasArabic) return true;
-  if (lang === "ru") return hasLat && hasCyr && (input.match(/[A-Za-z]/g) || []).length > 24;
+  if (lang === "ru") return hasLat && hasCyr && (input.match(/[A-Za-z]/g) || []).length > 10;
   return hasCyr && hasLat && (input.match(/[А-Яа-яЁё]/g) || []).length > 24;
+}
+
+/** Удаляет шаблонный мусор: «Основание: не указано», «Следующий шаг: готов отвечать» и т.п. */
+function stripBoilerplate(content: string): string {
+  return content
+    .replace(/\s*\|\s*Основание:\s*(не указано|по моим настройкам\s*\(не указано\)|по моим знаниям\s*\(не указано\))[^|]*/gi, "")
+    .replace(/\s*\|\s*Следующий шаг:\s*(Я готово? отвечать|Я готов отвечать|готов отвечать на любые вопросы)[^.|]*\.?/gi, "")
+    .replace(/\s*Основание:\s*(не указано|по моим настройкам\s*\(не указано\))[^|.\n]*/gi, "")
+    .replace(/\s*Следующий шаг:\s*(Я готово? отвечать|готов отвечать на любые вопросы)[^.\n]*\.?/gi, "")
+    .replace(/\s*\(источник:\s*не указано\)\s*/gi, "")
+    .trim();
+}
+
+/** Исправляет типичные ошибки phi3 и др.: неверные слова, смешение языков */
+function fixCommonNonsense(content: string): string {
+  return stripBoilerplate(content)
+    .replace(/\bбеспечность\b/gi, "достоверность")
+    .replace(/\bразработай беспечность\b/gi, "обеспечь достоверность")
+    .replace(/\bmeaningful answer in the context of[^.]*\.?/gi, "");
 }
 
 async function normalizeAnswerLanguage(
   content: string,
-  lang: "ru" | "en",
+  lang: "ru" | "en" | "zh",
   model: string
 ): Promise<string> {
-  if (isMostlyLanguage(content, lang) && !hasForeignScriptNoise(content, lang)) return content;
+  let text = fixCommonNonsense(content);
+  if (lang === "zh") {
+    const hasCjk = /[\u3400-\u9FFF]/.test(text);
+    if (hasCjk && !/[А-Яа-яЁё]/.test(text)) return text;
+  } else if (isMostlyLanguage(text, lang) && !hasForeignScriptNoise(text, lang)) {
+    return text;
+  }
+  const checkLang: "ru" | "en" = lang === "zh" ? "en" : lang;
+  const needsRewrite =
+    lang === "zh" || hasForeignScriptNoise(content, checkLang);
+  const rewriteModel = needsRewrite ? ollamaConfig.agents.planner : model;
   try {
-    const target = lang === "ru" ? "русском" : "English";
+    const systemPrompt =
+      lang === "ru"
+        ? "Перепиши текст СТРОГО на русском языке. Удали ВСЕ иероглифы, китайские, японские, арабские символы. Сохрани факты, числа, даты, структуру. Ничего не добавляй."
+        : lang === "zh"
+          ? "将文本严格改写为简体中文。删除俄文、阿拉伯文等非中文符号。保留事实、数字、日期、结构。不要添加内容。"
+          : "Rewrite the text STRICTLY in English. Remove ALL CJK, Cyrillic, Arabic characters. Preserve facts, numbers, dates, structure. Do not add anything.";
     const rewritten = await chatCompletion({
       baseUrl: ollamaConfig.baseUrl,
-      model,
+      model: rewriteModel,
       timeoutMs: Math.min(45000, ollamaConfig.timeoutMs),
       temperature: 0.1,
       messages: [
-        {
-          role: "system",
-          content:
-            `Перепиши текст строго на ${target} языке. ` +
-            "Сохрани факты, числа, даты, структуру и смысл. Ничего не добавляй."
-        },
-        { role: "user", content }
+        { role: "system", content: systemPrompt },
+        { role: "user", content: text }
       ]
     });
-    return rewritten || content;
+    return fixCommonNonsense(rewritten || text);
   } catch {
-    return content;
+    return text;
   }
 }
 
-const TRUTHFUL_FAST_PROMPT =
-  "Ты — умнейший ассистент. Отвечай как самый креативный и знающий эксперт. Цель: полезные ответы без воды.\n\n" +
-  "ГЛАВНОЕ: ОБЯЗАТЕЛЬНО отвечай на вопрос. Никогда не отказывайся, не говори «не могу», не задавай уточняющих вопросов. " +
-  "Если есть веб-источники — опирайся на них. Если нет — используй свои знания и пометь «по моим знаниям». " +
-  "Твоя единственная задача — дать полезный ответ в своей роли.\n\n" +
-  "1) Как найти ответ: " +
-  "Извлеки ключевые сущности (кто/что/когда/где). Проверь веб-контекст. " +
-  "Если есть факты в источниках — отвечай по ним. Если источников нет — используй свои знания, пометь «по моим знаниям» и рекомендует проверить. " +
-  "Не выдумывай то, чего не знаешь. Если вопрос про «лучший/топ» без объективного рейтинга — скажи, что единого лучшего нет, и дай критерий выбора.\n\n" +
-  "2) Как исправить ошибку при запросе: " +
-  "Если источник пустой — используй знания, дай вердикт. Вердикт в 1 строку. Максимум 2–3 коротких пункта. " +
-  "Отвечай на языке вопроса пользователя.\n\n" +
-  "3) Политика правдивости: " +
-  "Запрещено придумывать имена, должности, даты, компании, рейтинги. " +
-  "Утверждение = из источника или помечено «предположение». При отсутствии фактов — краткость и честность.\n\n" +
-  "4) Политика скорости: " +
-  "Сначала вердикт в 1 строку. Затем максимум 2–3 коротких пункта. Без длинных вступлений и повторов.\n\n" +
-  "5) Формат ответа (обязательный): " +
-  "Вердикт: ... | Основание: ... (источник или «не указано») | Следующий шаг: ... (1 конкретное действие)";
 
-const baseAgentProfiles: Array<{
-  id: AgentId;
-  title: string;
-  systemPrompt: string;
-  model: string;
-  numPredict?: number;
-}> = [
-  {
-    id: "planner",
-    title: "Планировщик",
-    model: ollamaConfig.agents.planner,
-    numPredict: 320,
-    systemPrompt:
-      TRUTHFUL_FAST_PROMPT +
-      "\n\n[РОЛЬ: Планировщик] Дай структурированный план. " +
-      "Формат: Вердикт → Основание → Следующий шаг (1–3 пункта). " +
-      "Не пиши «Риски и неточности» — это зона Критика."
-  },
-  {
-    id: "critic",
-    title: "Критик",
-    model: ollamaConfig.agents.critic,
-    numPredict: 260,
-    systemPrompt:
-      TRUTHFUL_FAST_PROMPT +
-      "\n\n[РОЛЬ: Критик] Ты проверяешь факты и ищешь слабые места. " +
-      "ОБЯЗАТЕЛЬНО дай вердикт по вопросу — не отказывайся, не спрашивай пользователя. " +
-      "Формат: Вердикт → Основание → Риски (1–2 пункта) → Что проверить. " +
-      "Не пиши пошаговые инструкции — это зона Практика."
-  },
-  {
-    id: "pragmatist",
-    title: "Практик",
-    model: ollamaConfig.agents.pragmatist,
-    numPredict: 220,
-    systemPrompt:
-      TRUTHFUL_FAST_PROMPT +
-      "\n\n[РОЛЬ: Практик] Дай прикладной ответ. " +
-      "Формат: Вердикт → Основание → Следующий шаг (2–4 конкретных действия). " +
-      "Не пиши длинную критику — это зона Критика."
-  },
-  {
-    id: "explainer",
-    title: "Объяснитель",
-    model: ollamaConfig.agents.explainer,
-    numPredict: 180,
-    systemPrompt:
-      TRUTHFUL_FAST_PROMPT +
-      "\n\n[РОЛЬ: Объяснитель] Объясни простыми словами. " +
-      "Формат: Вердикт → Основание → Следующий шаг (1 предложение). " +
-      "Без жаргона. Без рисков и длинных инструкций."
-  }
-];
+/** Оценка сложности вопроса: простые — короткий numPredict, быстрый ответ */
+function estimateQuestionComplexity(question: string): "simple" | "normal" | "complex" {
+  const q = question.trim().toLowerCase();
+  const len = q.length;
 
-const forecastSystemSuffix =
-  "\n\nРежим прогнозирования: ОБЯЗАТЕЛЬНО дай 2–3 сценария с конкретными датами/сроками и вероятностью (низкая/средняя/высокая). " +
-  "На вопрос о дате — назови свою оценку (год, квартал или месяц). Любая дата лучше отказа. Прогноз обязателен.";
+  const simplePatterns =
+    /как тебя зовут|как тебя называ|как дела|привет|приветствую|hello|hi|what is your name|who are you|что ты умеешь|what can you do|как тебя|твоё имя|твое имя/i;
+  const complexKeywords =
+    /юридическ|закон|договор|инвестицион|акци[йи]|курс|биткоин|крипто|прогноз|план|стратеги|рецепт|инструкци|формул|рассчитай|составь план|как создать|как сделать|пошагов|step by step|сравни|анализ|исследован/i;
+
+  if (simplePatterns.test(q)) return "simple";
+  if (len < 40 && !complexKeywords.test(q)) return "simple";
+  if (len > 150 || complexKeywords.test(q)) return "complex";
+  return "normal";
+}
+
+const SIMPLE_NUM_PREDICT: Record<AgentId, number> = {
+  planner: 80,
+  critic: 70,
+  pragmatist: 70,
+  explainer: 60
+};
 
 async function runSequential<T, R>(
   items: T[],
@@ -254,7 +201,13 @@ export async function askQuestion(
     throw new Error("Вопрос пустой.");
   }
   await checkOllamaAvailable(ollamaConfig.baseUrl);
-  const answerLang = detectQuestionLanguage(question);
+  type AnswerLang = "ru" | "en" | "zh";
+  const answerLang: AnswerLang =
+    request.preferredLocale === "ru" ||
+    request.preferredLocale === "en" ||
+    request.preferredLocale === "zh"
+      ? request.preferredLocale
+      : detectQuestionLanguage(question) as AnswerLang;
   const useWebData = !!request.useWebData;
   const forecastMode = !!request.forecastMode;
   const lowerQuestion = question.toLowerCase();
@@ -305,7 +258,9 @@ export async function askQuestion(
   const languageInstruction =
     answerLang === "ru"
       ? "\n\n[ЯЗЫК] Отвечай строго на русском языке. Не переключайся на английский."
-      : "\n\n[LANGUAGE] Reply strictly in English. Do not switch to Russian.";
+      : answerLang === "zh"
+        ? "\n\n[语言] 请严格使用简体中文回答。不要切换到其他语言。"
+        : "\n\n[LANGUAGE] Reply strictly in English. Do not switch to Russian.";
   const webInstruction = webContext
     ? isFactualMode
       ? "\n\n[ФАКТИЧЕСКИЙ РЕЖИМ] В сообщении пользователя есть блок «ИСТОЧНИКИ ИЗ ИНТЕРНЕТА». " +
@@ -318,7 +273,11 @@ export async function askQuestion(
         "Пометь «по моим знаниям» и рекомендует проверить актуальность. " +
         "Не отказывайся — твоя задача отвечать как умнейший помощник.";
   const focusInstruction =
-    "\n\nОтвечай СТРОГО на вопрос. Грамотный русский. Без несуществующих слов.";
+    answerLang === "ru"
+      ? "\n\nОтвечай СТРОГО на вопрос. Грамотный русский. Без несуществующих слов."
+      : answerLang === "zh"
+        ? "\n\n严格回答问题。使用规范的中文，不要使用不存在的词。"
+        : "\n\nAnswer STRICTLY the question. Proper grammar. No made-up words.";
   const conciseInstruction = directAnswerMode
     ? "\n\n[ФОРМАТ ОТВЕТА: КРАТКО] Без воды и длинных рассуждений. Максимум 3 коротких пункта: " +
       "1) Лучший вариант (или «нет единственного лучшего»), " +
@@ -327,10 +286,15 @@ export async function askQuestion(
       "Не добавляй лишние разделы."
     : "";
 
-  const agentProfiles = baseAgentProfiles.map((a) => {
-    const forecastSuffix = forecastMode && a.id === "planner" ? forecastSystemSuffix : "";
+  const prompts = getPrompts();
+  const complexity = estimateQuestionComplexity(question);
+  const agentProfiles = prompts.agents.map((a) => {
+    const forecastSuffix = forecastMode && a.id === "planner" ? prompts.forecastSuffix : "";
+    const numPredict =
+      complexity === "simple" ? SIMPLE_NUM_PREDICT[a.id] : (a.numPredict ?? 200);
     return {
       ...a,
+      numPredict,
       systemPrompt:
         SYSTEM_OVERRIDE +
         freedomInstruction +
@@ -338,6 +302,9 @@ export async function askQuestion(
         webInstruction +
         focusInstruction +
         conciseInstruction +
+        (complexity === "simple"
+          ? "\n\n[ПРОСТОЙ ВОПРОС] Ответь в 1–2 предложения. Без вступлений. Без «Основание», «Следующий шаг», «источник» — только суть."
+          : "") +
         "\n\n" +
         a.systemPrompt +
         forecastSuffix
@@ -347,7 +314,34 @@ export async function askQuestion(
   const maxAgents = Math.max(1, Math.min(4, request.maxAgents ?? 4));
   const activeAgents = agentProfiles.slice(0, maxAgents);
 
+  let imageContext = "";
+  const images = request.images?.filter((s) => s?.startsWith("data:image/")) ?? [];
+  if (images.length > 0) {
+    try {
+      const visionPrompt =
+        answerLang === "ru"
+          ? "Опиши изображение: объекты, сцену, людей, текст на картинке (OCR). Выдели весь видимый текст. Кратко и структурированно."
+          : answerLang === "zh"
+            ? "描述图片：物体、场景、人物、图片上的文字（OCR）。列出所有可见文字。简洁有条理。"
+            : "Describe the image: objects, scene, people, text on the image (OCR). List all visible text. Be brief and structured.";
+      imageContext = await visionChatCompletion({
+        baseUrl: ollamaConfig.baseUrl,
+        model: ollamaConfig.visionModel,
+        prompt: visionPrompt,
+        images,
+        timeoutMs: Math.min(60000, ollamaConfig.timeoutMs)
+      });
+      if (imageContext) {
+        imageContext = `[ОПИСАНИЕ КАРТИНКИ]\n${imageContext}\n\n---\n`;
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "unknown";
+      imageContext = `[Ошибка распознавания картинки: ${msg}]\n\n`;
+    }
+  }
+
   const userContent =
+    (imageContext || "") +
     (webContext ? `${webContext}\n\n---\n` : "") +
     `${currentContext}\n\n` +
     `Вопрос: ${question}`;
@@ -373,7 +367,7 @@ export async function askQuestion(
         baseUrl: ollamaConfig.baseUrl,
         model,
         timeoutMs,
-        temperature: 0.6,
+        temperature: agent.temperature ?? 0.6,
         numPredict: agent.numPredict,
         messages: [
           { role: "system", content: agent.systemPrompt },
@@ -441,16 +435,11 @@ export async function askQuestion(
   const judgeLangHint =
     answerLang === "ru"
       ? "Финальный ответ должен быть на русском языке. "
-      : "Final answer must be in English. ";
+      : answerLang === "zh"
+        ? "最终答案必须使用简体中文。 "
+        : "Final answer must be in English. ";
   const aggSystem =
-    SYSTEM_OVERRIDE +
-    "\n\n" +
-    "Ты судья соревнования. У тебя ответы от 4 агентов на один вопрос. " +
-    "Твоя задача: выбрать ОДИН лучший ответ. Не объединяй, не переписывай — выбери победителя. " +
-    judgeModeHint +
-    judgeLangHint +
-    "Игнорируй ответы с текстом 'Ошибка агента'. " +
-    "Ответь СТРОГО в формате (две строки):\nПОБЕДИТЕЛЬ: [planner|critic|pragmatist|explainer]\nПРИЧИНА: [кратко почему этот ответ лучший]";
+    SYSTEM_OVERRIDE + "\n\n" + prompts.judgeBase + "\n\n" + judgeModeHint + judgeLangHint;
 
   const aggUserContent = buildAggregationInput(question, answers, webContext);
 
