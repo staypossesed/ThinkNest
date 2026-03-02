@@ -40,7 +40,8 @@ ollama pull phi3
 ### Переменные окружения
 1. Скопируй `backend/.env.example` -> `backend/.env` и заполни все ключи.
 2. Скопируй `.env.example` -> `.env` в корне (desktop env).
-3. **Web Search (Use Web Data):** добавь в корневой `.env` один из ключей:
+3. **Промпты (опционально):** скопируй `src/main/prompts.private.example.ts` -> `src/main/prompts.private.ts` и заполни своими промптами. Без этого — минимальные defaults. Файл в .gitignore.
+4. **Web Search (Use Web Data):** добавь в корневой `.env` один из ключей:
    - `SERPER_API_KEY` — бесплатно 2500 запросов/мес: https://serper.dev
    - `SERPAPI_KEY` — альтернатива: https://serpapi.com
    Без ключа поиск использует только Wikipedia и DuckDuckGo (менее надёжно).
