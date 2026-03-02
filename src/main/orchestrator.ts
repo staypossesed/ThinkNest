@@ -75,6 +75,24 @@ function detectQuestionLanguage(input: string): "ru" | "en" {
   return cyr >= lat ? "ru" : "en";
 }
 
+function estimateRoleAdherence(agentId: AgentId, content: string): number {
+  const t = content.toLowerCase();
+  if (agentId === "critic") {
+    const hasRisks = /риск|неточност|провер/i.test(content);
+    return hasRisks ? 1 : 0;
+  }
+  if (agentId === "planner") {
+    const hasSteps = /1\)|1\.|шаг/i.test(t);
+    return hasSteps ? 1 : 0;
+  }
+  if (agentId === "pragmatist") {
+    const hasActions = /что делать|шаг|чек-?лист|проверь/i.test(content);
+    return hasActions ? 1 : 0;
+  }
+  const hasSimple = /прост|пример|аналог/i.test(content);
+  return hasSimple ? 1 : 0;
+}
+
 function isMostlyLanguage(input: string, lang: "ru" | "en"): boolean {
   const cyr = (input.match(/[А-Яа-яЁё]/g) || []).length;
   const lat = (input.match(/[A-Za-z]/g) || []).length;
@@ -82,12 +100,22 @@ function isMostlyLanguage(input: string, lang: "ru" | "en"): boolean {
   return lat >= Math.max(20, cyr);
 }
 
+function hasForeignScriptNoise(input: string, lang: "ru" | "en"): boolean {
+  const hasCjk = /[\u3400-\u9FFF]/.test(input);
+  const hasArabic = /[\u0600-\u06FF]/.test(input);
+  const hasCyr = /[А-Яа-яЁё]/.test(input);
+  const hasLat = /[A-Za-z]/.test(input);
+  if (hasCjk || hasArabic) return true;
+  if (lang === "ru") return hasLat && hasCyr && (input.match(/[A-Za-z]/g) || []).length > 24;
+  return hasCyr && hasLat && (input.match(/[А-Яа-яЁё]/g) || []).length > 24;
+}
+
 async function normalizeAnswerLanguage(
   content: string,
   lang: "ru" | "en",
   model: string
 ): Promise<string> {
-  if (isMostlyLanguage(content, lang)) return content;
+  if (isMostlyLanguage(content, lang) && !hasForeignScriptNoise(content, lang)) return content;
   try {
     const target = lang === "ru" ? "русском" : "English";
     const rewritten = await chatCompletion({
@@ -111,6 +139,42 @@ async function normalizeAnswerLanguage(
   }
 }
 
+function buildNoSourcesAnswer(
+  agentId: AgentId,
+  lang: "ru" | "en",
+  directAnswerMode: boolean
+): string {
+  if (lang === "en") {
+    if (!directAnswerMode) return "Not specified in found sources.";
+    if (agentId === "critic") return "Verdict: Not specified in found sources.\nCheck more reliable web sources.";
+    if (agentId === "planner") return "1) Best option: not specified in found sources.\n2) Next step: provide a concrete domain/source.";
+    if (agentId === "pragmatist") return "1) Practical output: not specified in found sources.\n2) Action: share a concrete profile or source to verify.";
+    return "Simple explanation: no verified source found, so no exact name can be given.";
+  }
+  if (!directAnswerMode) return "в найденных источниках не указано";
+  if (agentId === "critic") return "Вердикт: в найденных источниках не указано.\nНужно проверить дополнительные надежные источники.";
+  if (agentId === "planner") return "1) Лучший вариант: в найденных источниках не указано.\n2) Следующий шаг: уточни нишу и предоставь конкретный источник.";
+  if (agentId === "pragmatist") return "1) Практический вывод: в найденных источниках не указано.\n2) Что делать: пришли профиль/сайт кандидата для проверки.";
+  return "Простое объяснение: без подтвержденных источников нельзя назвать конкретного человека.";
+}
+
+const TRUTHFUL_FAST_PROMPT =
+  "Ты — точный и быстрый ассистент. Цель: правдивые ответы без воды.\n\n" +
+  "1) Как найти ответ: " +
+  "Извлеки ключевые сущности (кто/что/когда/где). Проверь веб-контекст. " +
+  "Если есть факты — отвечай только по ним. Если источников нет или пусто — напиши «в найденных источниках не указано». " +
+  "Не выдумывай. Если вопрос про «лучший/топ» без объективного рейтинга — скажи, что единого лучшего нет, и дай критерий выбора.\n\n" +
+  "2) Как исправить ошибку при запросе: " +
+  "Если источник пустой или ошибка — не фантазируй. Вердикт в 1 строку. Максимум 2–3 коротких пункта. " +
+  "Отвечай на языке вопроса пользователя.\n\n" +
+  "3) Политика правдивости: " +
+  "Запрещено придумывать имена, должности, даты, компании, рейтинги. " +
+  "Утверждение = из источника или помечено «предположение». При отсутствии фактов — краткость и честность.\n\n" +
+  "4) Политика скорости: " +
+  "Сначала вердикт в 1 строку. Затем максимум 2–3 коротких пункта. Без длинных вступлений и повторов.\n\n" +
+  "5) Формат ответа (обязательный): " +
+  "Вердикт: ... | Основание: ... (источник или «не указано») | Следующий шаг: ... (1 конкретное действие)";
+
 const baseAgentProfiles: Array<{
   id: AgentId;
   title: string;
@@ -124,12 +188,10 @@ const baseAgentProfiles: Array<{
     model: ollamaConfig.agents.planner,
     numPredict: 320,
     systemPrompt:
-      "Ты Планировщик — даешь структурированный план и последовательность. " +
-      "Формат строго: " +
-      "1) Краткий ответ (1-2 строки). " +
-      "2) План действий/разбора (3-5 нумерованных шагов). " +
-      "3) Итог. " +
-      "Не пиши разделы «Риски и неточности» — это зона Критика."
+      TRUTHFUL_FAST_PROMPT +
+      "\n\n[РОЛЬ: Планировщик] Дай структурированный план. " +
+      "Формат: Вердикт → Основание → Следующий шаг (1–3 пункта). " +
+      "Не пиши «Риски и неточности» — это зона Критика."
   },
   {
     id: "critic",
@@ -137,11 +199,9 @@ const baseAgentProfiles: Array<{
     model: ollamaConfig.agents.critic,
     numPredict: 260,
     systemPrompt:
-      "Ты Критик — проверяешь факты и ищешь слабые места. " +
-      "Формат строго: " +
-      "1) Краткий вердикт. " +
-      "2) Риски и неточности (минимум 2 пункта). " +
-      "3) Что нужно проверить дополнительно (1-2 пункта). " +
+      TRUTHFUL_FAST_PROMPT +
+      "\n\n[РОЛЬ: Критик] Проверь факты и слабые места. " +
+      "Формат: Вердикт → Основание → Риски (1–2 пункта) → Что проверить." +
       "Не пиши пошаговые инструкции — это зона Практика."
   },
   {
@@ -150,11 +210,9 @@ const baseAgentProfiles: Array<{
     model: ollamaConfig.agents.pragmatist,
     numPredict: 220,
     systemPrompt:
-      "Ты Практик — даешь прикладной, полезный ответ. " +
-      "Формат строго: " +
-      "1) Практический вывод (1-2 строки). " +
-      "2) Что делать пользователю дальше (2-4 конкретных шага). " +
-      "3) Короткий чек-лист проверки результата. " +
+      TRUTHFUL_FAST_PROMPT +
+      "\n\n[РОЛЬ: Практик] Дай прикладной ответ. " +
+      "Формат: Вердикт → Основание → Следующий шаг (2–4 конкретных действия). " +
       "Не пиши длинную критику — это зона Критика."
   },
   {
@@ -163,12 +221,10 @@ const baseAgentProfiles: Array<{
     model: ollamaConfig.agents.explainer,
     numPredict: 180,
     systemPrompt:
-      "Ты Объяснитель — объясняешь простыми словами для новичка. " +
-      "Формат строго: " +
-      "1) Простое объяснение (без жаргона). " +
-      "2) Мини-пример или аналогия. " +
-      "3) Вывод в 1 предложении. " +
-      "Не пиши блок «Риски и неточности» и не давай длинные инструкции."
+      TRUTHFUL_FAST_PROMPT +
+      "\n\n[РОЛЬ: Объяснитель] Объясни простыми словами. " +
+      "Формат: Вердикт → Основание → Следующий шаг (1 предложение). " +
+      "Без жаргона. Без рисков и длинных инструкций."
   }
 ];
 
@@ -214,9 +270,21 @@ export async function askQuestion(
   }
   await checkOllamaAvailable(ollamaConfig.baseUrl);
   const answerLang = detectQuestionLanguage(question);
-
   const useWebData = !!request.useWebData;
   const forecastMode = !!request.forecastMode;
+  const lowerQuestion = question.toLowerCase();
+  const directAnswerMode =
+    /кто.*лучше|лучший|best|who is best|кому.*обрат|к кому.*обрат|who to contact|help me/i.test(
+      lowerQuestion
+    );
+  // #region agent log
+  _dbg("orchestrator.ts:modes", "computed request modes", {
+    answerLang,
+    useWebData,
+    forecastMode,
+    directAnswerMode
+  }, "H21");
+  // #endregion
 
   let webSources: WebSource[] = [];
   let webContext = "";
@@ -259,9 +327,19 @@ export async function askQuestion(
         "Твой ответ ДОЛЖЕН содержать ТОЛЬКО имена, даты и факты из этого блока. " +
         "НЕ ВЫДУМЫВАЙ. Если в блоке нет ответа — напиши «в найденных источниках не указано»."
       : "\n\n[РЕЖИМ ПРОГНОЗА] Планировщик может давать прогнозы. Остальные — опирайся на веб-блок ниже."
-    : "\n\nКогда фактов нет — допускай, предполагай. Для прогнозов — фантазируй.";
+    : forecastMode
+      ? "\n\n[РЕЖИМ ПРОГНОЗА] Можно давать допущения, но помечай их как предположение."
+      : "\n\n[НЕТ ИСТОЧНИКОВ] Если нет подтверждённых данных, прямо напиши «в найденных источниках не указано». " +
+        "ЗАПРЕЩЕНО выдумывать имена, должности, компании, рейтинги и факты.";
   const focusInstruction =
     "\n\nОтвечай СТРОГО на вопрос. Грамотный русский. Без несуществующих слов.";
+  const conciseInstruction = directAnswerMode
+    ? "\n\n[ФОРМАТ ОТВЕТА: КРАТКО] Без воды и длинных рассуждений. Максимум 3 коротких пункта: " +
+      "1) Лучший вариант (или «нет единственного лучшего»), " +
+      "2) К кому обратиться/где искать помощь, " +
+      "3) 1 критерий выбора. " +
+      "Не добавляй лишние разделы."
+    : "";
 
   const agentProfiles = baseAgentProfiles.map((a) => {
     const forecastSuffix = forecastMode && a.id === "planner" ? forecastSystemSuffix : "";
@@ -273,6 +351,7 @@ export async function askQuestion(
         languageInstruction +
         webInstruction +
         focusInstruction +
+        conciseInstruction +
         "\n\n" +
         a.systemPrompt +
         forecastSuffix
@@ -302,10 +381,7 @@ export async function askQuestion(
   ): Promise<AgentAnswer> => {
     const start = performance.now();
     const model = agent.model;
-    const timeoutMs =
-      /qwen/i.test(model) || /mistral/i.test(model)
-        ? ollamaConfig.timeoutMs + 60000
-        : ollamaConfig.timeoutMs;
+    const timeoutMs = ollamaConfig.timeoutMs + 60000;
     try {
       const rawContent = await chatCompletion({
         baseUrl: ollamaConfig.baseUrl,
@@ -318,7 +394,17 @@ export async function askQuestion(
           { role: "user", content: userContent }
         ]
       });
-      const content = await normalizeAnswerLanguage(rawContent, answerLang, model);
+      let content = await normalizeAnswerLanguage(rawContent, answerLang, model);
+      if (useWebData && !webContext && !forecastMode) {
+        content = buildNoSourcesAnswer(agent.id, answerLang, directAnswerMode);
+        // #region agent log
+        _dbg("orchestrator.ts:noSourceOverride", "override answer due empty web context", {
+          agentId: agent.id,
+          directAnswerMode,
+          lang: answerLang
+        }, "H28");
+        // #endregion
+      }
       const durationMs = Math.round(performance.now() - start);
       const answer: AgentAnswer = {
         id: agent.id,
@@ -333,9 +419,13 @@ export async function askQuestion(
         agentId: agent.id,
         model: agent.model,
         answerPreview: content.slice(0, 300),
+        length: content.length,
+        lines: content.split(/\r?\n/).length,
+        roleAdherence: estimateRoleAdherence(agent.id, content),
+        saysNoInfo: /не указано|нет точных данных|insufficient|not specified/i.test(content),
         hasTrump: /трамп|trump/i.test(content),
         hasBiden: /байден|biden/i.test(content)
-      }, "H10");
+      }, "H22");
       // #endregion
       return answer;
     } catch (error) {

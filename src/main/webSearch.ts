@@ -50,10 +50,19 @@ function isPresidentUSAQuery(input: string): boolean {
   );
 }
 
+function normalizeQuery(input: string): string {
+  return input
+    .replace(/\[test\s*\d+\]/gi, " ")
+    .replace(/[^\p{L}\p{N}\s\-?]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 140);
+}
+
 /** Search using provider chain: Google (SerpAPI) -> Wikipedia/Wikidata -> DDG Instant API. */
 export async function searchWeb(queries: string[]): Promise<WebSearchResult[]> {
   if (queries.length === 0) return [];
-  const raw = (queries[0] || "").trim();
+  const raw = normalizeQuery((queries[0] || "").trim());
   const isPresidentUSA = isPresidentUSAQuery(raw);
   // #region agent log
   _dbg(
@@ -81,7 +90,7 @@ export async function searchWeb(queries: string[]): Promise<WebSearchResult[]> {
     return factual.length > 0 ? [...factual, ...wikiResults].slice(0, MAX_TOTAL) : wikiResults;
   }
 
-  const ddgInstant = await searchDuckDuckGoInstantFallback(queries);
+  const ddgInstant = await searchDuckDuckGoInstantFallback([raw], false);
   if (ddgInstant.length > 0) {
     if (!isPresidentUSA) return ddgInstant;
     const factual = await searchCurrentUsPresidentFact();
@@ -243,7 +252,10 @@ async function searchCurrentUsPresidentFact(): Promise<WebSearchResult[]> {
 }
 
 /** Fallback #1: DuckDuckGo Instant Answer API (no vqd). */
-async function searchDuckDuckGoInstantFallback(queries: string[]): Promise<WebSearchResult[]> {
+async function searchDuckDuckGoInstantFallback(
+  queries: string[],
+  allowWikipediaFallback = true
+): Promise<WebSearchResult[]> {
   const raw = (queries[0] || "").trim();
   if (!raw) return [];
   try {
@@ -254,7 +266,7 @@ async function searchDuckDuckGoInstantFallback(queries: string[]): Promise<WebSe
     // #region agent log
     _dbg("webSearch.ts:ddgInstantStatus", "ddg instant response status", { status: res.status }, "H14");
     // #endregion
-    if (!res.ok) return searchWikipediaFallback(queries);
+    if (!res.ok) return allowWikipediaFallback ? searchWikipediaFallback(queries) : [];
 
     const json = (await res.json()) as {
       Heading?: string;
@@ -293,19 +305,19 @@ async function searchDuckDuckGoInstantFallback(queries: string[]): Promise<WebSe
     );
     // #endregion
     if (out.length > 0) return out;
-    return searchWikipediaFallback(queries);
+    return allowWikipediaFallback ? searchWikipediaFallback(queries) : [];
   } catch (err) {
     const msg = err instanceof Error ? err.message : "unknown";
     // #region agent log
     _dbg("webSearch.ts:ddgInstantCatch", "ddg instant failed", { msg }, "H14");
     // #endregion
-    return searchWikipediaFallback(queries);
+    return allowWikipediaFallback ? searchWikipediaFallback(queries) : [];
   }
 }
 
 /** Fallback #2: Wikipedia Search API (legacy api.php, more stable than rest.php). */
 async function searchWikipediaFallback(queries: string[]): Promise<WebSearchResult[]> {
-  const raw = (queries[0] || "").trim().slice(0, 100).toLowerCase();
+  const raw = normalizeQuery((queries[0] || "").trim().slice(0, 100)).toLowerCase();
   const isPresidentUSA =
     /президент.*сша|сша.*президент|president.*usa|usa.*president|president.*america/i.test(raw);
   const isPotatoRussia =
@@ -323,7 +335,10 @@ async function searchWikipediaFallback(queries: string[]): Promise<WebSearchResu
     const url =
       `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${q}` +
       "&format=json&utf8=1&srlimit=5";
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(8000),
+      headers: { "User-Agent": "ThinkNest/1.0 (local desktop app)" }
+    });
     // #region agent log
     _dbg("webSearch.ts:wikipediaStatus", "wikipedia response status", { status: res.status }, "H11");
     // #endregion
