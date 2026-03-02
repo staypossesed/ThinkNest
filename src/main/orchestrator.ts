@@ -433,7 +433,8 @@ export async function askQuestion(
 
   const aggStart = performance.now();
   const judgeModeHint = isFactualMode
-    ? "При фактическом вопросе предпочитай ответ с опорой на источники, без выдуманных фактов. "
+    ? "КРИТИЧНО: Ниже есть блок ИСТОЧНИКИ. Выбери ответ, который СОВПАДАЕТ с источниками. " +
+      "ОТВЕРГНИ ответы с именами/фактами, которых НЕТ в источниках (это выдумки). "
     : forecastMode
       ? "При прогнозе можно выбрать ответ с разумными допущениями. "
       : "";
@@ -451,6 +452,8 @@ export async function askQuestion(
     "Игнорируй ответы с текстом 'Ошибка агента'. " +
     "Ответь СТРОГО в формате (две строки):\nПОБЕДИТЕЛЬ: [planner|critic|pragmatist|explainer]\nПРИЧИНА: [кратко почему этот ответ лучший]";
 
+  const aggUserContent = buildAggregationInput(question, answers, webContext);
+
   try {
     const judgeResponse = await chatCompletion({
       baseUrl: ollamaConfig.baseUrl,
@@ -459,7 +462,7 @@ export async function askQuestion(
       temperature: 0.3,
       messages: [
         { role: "system", content: aggSystem },
-        { role: "user", content: buildAggregationInput(question, answers) }
+        { role: "user", content: aggUserContent }
       ]
     });
 
@@ -533,7 +536,11 @@ function parseWinnerReason(judgeResponse: string): string {
   return m?.[1]?.trim() ?? "";
 }
 
-function buildAggregationInput(question: string, answers: AgentAnswer[]): string {
+function buildAggregationInput(
+  question: string,
+  answers: AgentAnswer[],
+  webContext?: string
+): string {
   const formatted = answers
     .map((answer) => {
       const isError = answer.content.startsWith("Ошибка агента:");
@@ -541,5 +548,9 @@ function buildAggregationInput(question: string, answers: AgentAnswer[]): string
     })
     .join("\n\n");
 
-  return `Вопрос:\n${question}\n\nОтветы агентов:\n${formatted}`;
+  const sourcesBlock =
+    webContext && webContext.length > 0
+      ? `\n\n=== ИСТОЧНИКИ (проверяй ответы по ним, отвергай выдумки) ===\n${webContext}\n`
+      : "";
+  return `Вопрос:\n${question}\n\nОтветы агентов:\n${formatted}${sourcesBlock}`;
 }

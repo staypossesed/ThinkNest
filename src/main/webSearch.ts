@@ -44,6 +44,25 @@ const MAX_RESULTS_PER_QUERY = 5;
 const MAX_TOTAL = 12;
 const SNIPPET_LEN = 500;
 
+/** MyMemory API — бесплатный перевод ru->en для улучшения Wikipedia поиска. */
+async function translateToEnglish(text: string): Promise<string | null> {
+  const q = text.trim().slice(0, 200);
+  if (!q) return null;
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(q)}&langpair=ru|en`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      responseStatus?: number;
+      responseData?: { translatedText?: string };
+    };
+    const translated = json.responseData?.translatedText?.trim();
+    return translated && translated !== q ? translated : null;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeQuery(input: string): string {
   return input
     .replace(/\[test\s*\d+\]/gi, " ")
@@ -67,8 +86,12 @@ export async function searchWeb(queries: string[]): Promise<WebSearchResult[]> {
   const googleResults = await searchGoogle([raw]);
   if (googleResults.length > 0) return googleResults;
 
-  // 2) Wikipedia — универсальный поиск по запросу
-  const wikiResults = await searchWikipediaFallback([raw]);
+  // 2) Wikipedia — универсальный поиск. Для русских запросов: fallback на английский
+  let wikiResults = await searchWikipediaFallback([raw]);
+  if (wikiResults.length === 0 && /[\u0400-\u04FF]/.test(raw)) {
+    const enQuery = await translateToEnglish(raw);
+    if (enQuery) wikiResults = await searchWikipediaFallback([enQuery]);
+  }
   if (wikiResults.length > 0) return wikiResults;
 
   // 3) DuckDuckGo
