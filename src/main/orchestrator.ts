@@ -11,6 +11,7 @@ import { chatCompletion, visionChatCompletion } from "./ollama";
 import { ollamaConfig } from "./config";
 import { searchWeb, formatWebContext } from "./webSearch";
 import { getPrompts } from "./prompts.config";
+import { getAskLocale } from "./askContext";
 
 // Debug: no-op для публичного репо (включать только локально при отладке)
 function _dbg(_loc: string, _msg: string, _data: Record<string, unknown>, _hid?: string): void {
@@ -202,12 +203,11 @@ export async function askQuestion(
   }
   await checkOllamaAvailable(ollamaConfig.baseUrl);
   type AnswerLang = "ru" | "en" | "zh";
-  const answerLang: AnswerLang =
-    request.preferredLocale === "ru" ||
-    request.preferredLocale === "en" ||
-    request.preferredLocale === "zh"
-      ? request.preferredLocale
-      : detectQuestionLanguage(question) as AnswerLang;
+  const getAnswerLang = (): AnswerLang => {
+    const loc = getAskLocale() ?? request.preferredLocale;
+    if (loc === "ru" || loc === "en" || loc === "zh") return loc;
+    return detectQuestionLanguage(question) as AnswerLang;
+  };
   const useWebData = !!request.useWebData;
   const forecastMode = !!request.forecastMode;
   const lowerQuestion = question.toLowerCase();
@@ -217,7 +217,7 @@ export async function askQuestion(
     );
   // #region agent log
   _dbg("orchestrator.ts:modes", "computed request modes", {
-    answerLang,
+    answerLang: getAnswerLang(),
     useWebData,
     forecastMode,
     directAnswerMode
@@ -255,10 +255,10 @@ export async function askQuestion(
   // #endregion
 
   const isFactualMode = webContext && !forecastMode;
-  const languageInstruction =
-    answerLang === "ru"
+  const getLanguageInstruction = (lang: AnswerLang) =>
+    lang === "ru"
       ? "\n\n[ЯЗЫК] Отвечай строго на русском языке. Не переключайся на английский."
-      : answerLang === "zh"
+      : lang === "zh"
         ? "\n\n[语言] 请严格使用简体中文回答。不要切换到其他语言。"
         : "\n\n[LANGUAGE] Reply strictly in English. Do not switch to Russian.";
   const webInstruction = webContext
@@ -272,10 +272,10 @@ export async function askQuestion(
       : "\n\n[НЕТ ВЕБ-ИСТОЧНИКОВ] Используй свои знания. Дай умный, полезный ответ. " +
         "Пометь «по моим знаниям» и рекомендует проверить актуальность. " +
         "Не отказывайся — твоя задача отвечать как умнейший помощник.";
-  const focusInstruction =
-    answerLang === "ru"
+  const getFocusInstruction = (lang: AnswerLang) =>
+    lang === "ru"
       ? "\n\nОтвечай СТРОГО на вопрос. Грамотный русский. Без несуществующих слов."
-      : answerLang === "zh"
+      : lang === "zh"
         ? "\n\n严格回答问题。使用规范的中文，不要使用不存在的词。"
         : "\n\nAnswer STRICTLY the question. Proper grammar. No made-up words.";
   const conciseInstruction = directAnswerMode
@@ -288,27 +288,28 @@ export async function askQuestion(
 
   const prompts = getPrompts();
   const complexity = estimateQuestionComplexity(question);
+  const buildSystemPrompt = (agent: { systemPrompt: string; id: AgentId }) => {
+    const lang = getAnswerLang();
+    const forecastSuffix = forecastMode && agent.id === "planner" ? prompts.forecastSuffix : "";
+    return (
+      SYSTEM_OVERRIDE +
+      freedomInstruction +
+      getLanguageInstruction(lang) +
+      webInstruction +
+      getFocusInstruction(lang) +
+      conciseInstruction +
+      (complexity === "simple"
+        ? "\n\n[ПРОСТОЙ ВОПРОС] Ответь в 1–2 предложения. Без вступлений. Без «Основание», «Следующий шаг», «источник» — только суть."
+        : "") +
+      "\n\n" +
+      agent.systemPrompt +
+      forecastSuffix
+    );
+  };
   const agentProfiles = prompts.agents.map((a) => {
-    const forecastSuffix = forecastMode && a.id === "planner" ? prompts.forecastSuffix : "";
     const numPredict =
       complexity === "simple" ? SIMPLE_NUM_PREDICT[a.id] : (a.numPredict ?? 200);
-    return {
-      ...a,
-      numPredict,
-      systemPrompt:
-        SYSTEM_OVERRIDE +
-        freedomInstruction +
-        languageInstruction +
-        webInstruction +
-        focusInstruction +
-        conciseInstruction +
-        (complexity === "simple"
-          ? "\n\n[ПРОСТОЙ ВОПРОС] Ответь в 1–2 предложения. Без вступлений. Без «Основание», «Следующий шаг», «источник» — только суть."
-          : "") +
-        "\n\n" +
-        a.systemPrompt +
-        forecastSuffix
-    };
+    return { ...a, numPredict };
   });
 
   const maxAgents = Math.max(1, Math.min(4, request.maxAgents ?? 4));
@@ -319,11 +320,11 @@ export async function askQuestion(
   if (images.length > 0) {
     try {
       const visionPrompt =
-        answerLang === "ru"
-          ? "Опиши изображение: объекты, сцену, людей, текст на картинке (OCR). Выдели весь видимый текст. Кратко и структурированно."
-          : answerLang === "zh"
-            ? "描述图片：物体、场景、人物、图片上的文字（OCR）。列出所有可见文字。简洁有条理。"
-            : "Describe the image: objects, scene, people, text on the image (OCR). List all visible text. Be brief and structured.";
+        getAnswerLang() === "ru"
+          ? "Проанализируй изображение полностью. Укажи: 1) Объекты, сцену, людей. 2) Весь видимый текст (OCR). 3) Что, по-твоему, хотел передать автор. Может быть и объект, и текст, и то и другое. Структурированно."
+          : getAnswerLang() === "zh"
+            ? "全面分析图片。包括：1) 物体、场景、人物。2) 所有可见文字（OCR）。3) 作者可能想表达什么。可能是物体、文字或两者。有条理。"
+            : "Analyze the image fully. Include: 1) Objects, scene, people. 2) All visible text (OCR). 3) What the author might be trying to convey. Could be object, text, or both. Be structured.";
       imageContext = await visionChatCompletion({
         baseUrl: ollamaConfig.baseUrl,
         model: ollamaConfig.visionModel,
@@ -336,15 +337,26 @@ export async function askQuestion(
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "unknown";
-      imageContext = `[Ошибка распознавания картинки: ${msg}]\n\n`;
+      throw new Error(
+        msg.includes("Vision-модель") || msg.includes("ollama pull")
+          ? msg
+          : `Не удалось распознать картинку: ${msg}. Установите vision-модель: ollama pull llava`
+      );
     }
   }
 
+  const isImageOnly = question === "[Изображение]" && imageContext.length > 0;
+  const imageOnlyInstruction =
+    getAnswerLang() === "ru"
+      ? "Пользователь отправил изображение. Контекст выше. Дай полезный ответ на основе контекста — объекты, текст (если есть), намерение автора, или что пользователь мог хотеть узнать."
+      : getAnswerLang() === "zh"
+        ? "用户发送了图片。上下文如上。根据上下文给出有用回答——物体、文字（如有）、作者意图或用户可能想了解的内容。"
+        : "User sent an image. Context above. Give a useful answer based on the context — objects, text (if any), author intent, or what the user might want to know.";
   const userContent =
     (imageContext || "") +
     (webContext ? `${webContext}\n\n---\n` : "") +
     `${currentContext}\n\n` +
-    `Вопрос: ${question}`;
+    (isImageOnly ? imageOnlyInstruction : `Вопрос: ${question}`);
 
   // #region agent log
   _dbg("orchestrator.ts:userContent", "content sent to agents", {
@@ -370,11 +382,11 @@ export async function askQuestion(
         temperature: agent.temperature ?? 0.6,
         numPredict: agent.numPredict,
         messages: [
-          { role: "system", content: agent.systemPrompt },
+          { role: "system", content: buildSystemPrompt(agent) },
           { role: "user", content: userContent }
         ]
       });
-      let content = await normalizeAnswerLanguage(rawContent, answerLang, model);
+      let content = await normalizeAnswerLanguage(rawContent, getAnswerLang(), model);
       const durationMs = Math.round(performance.now() - start);
       const answer: AgentAnswer = {
         id: agent.id,
@@ -433,9 +445,9 @@ export async function askQuestion(
       ? "При прогнозе можно выбрать ответ с разумными допущениями. "
       : "";
   const judgeLangHint =
-    answerLang === "ru"
+    getAnswerLang() === "ru"
       ? "Финальный ответ должен быть на русском языке. "
-      : answerLang === "zh"
+      : getAnswerLang() === "zh"
         ? "最终答案必须使用简体中文。 "
         : "Final answer must be in English. ";
   const aggSystem =

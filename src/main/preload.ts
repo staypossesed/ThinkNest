@@ -34,5 +34,7 @@ contextBridge.exposeInMainWorld("api", {
   openPortal: (): Promise<{ ok: true }> => ipcRenderer.invoke("billing:portal"),
   openExternal: (url: string): Promise<void> =>
     ipcRenderer.invoke("openExternal", url),
-  isDevMode: (): Promise<boolean> => ipcRenderer.invoke("isDevMode")
+  isDevMode: (): Promise<boolean> => ipcRenderer.invoke("isDevMode"),
+  setAskLocale: (locale: string): Promise<void> =>
+    ipcRenderer.invoke("ask:update-locale", locale)
 });

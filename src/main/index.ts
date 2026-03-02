@@ -10,6 +10,7 @@ dotenv.config({ path: backendEnv });
 import { askQuestion } from "./orchestrator";
 import { AskRequest } from "../shared/types";
 import { backendClient, isDevMode } from "./backend";
+import { setAskLocale, clearAskLocale, beginAsk, updateAskLocaleIfActive } from "./askContext";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -41,10 +42,19 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("ask", async (event, payload: AskRequest) => {
+    setAskLocale(payload.preferredLocale ?? "ru");
+    beginAsk();
     const onAnswer = (answer: import("../shared/types").AgentAnswer) => {
       event.sender.send("ask:answer", answer);
     };
-    return askQuestion(payload, onAnswer);
+    try {
+      return await askQuestion(payload, onAnswer);
+    } finally {
+      clearAskLocale();
+    }
+  });
+  ipcMain.handle("ask:update-locale", (_event, locale: string) => {
+    updateAskLocaleIfActive(locale);
   });
   ipcMain.handle("auth:get-session", async () => backendClient.getSession());
   ipcMain.handle("isDevMode", () => isDevMode);

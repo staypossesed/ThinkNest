@@ -25,6 +25,7 @@ declare global {
       openPortal: () => Promise<{ ok: true }>;
       openExternal: (url: string) => Promise<void>;
       isDevMode: () => Promise<boolean>;
+      setAskLocale: (locale: string) => Promise<void>;
     };
   }
 }

@@ -11,7 +11,8 @@ function getOllamaBase(baseUrl: string): string {
 /** Data URI (data:image/png;base64,...) → raw base64 для Ollama */
 function dataUriToBase64(dataUri: string): string {
   const m = dataUri.match(/^data:image\/[^;]+;base64,(.+)$/);
-  return m ? m[1] : dataUri;
+  const raw = m ? m[1] : dataUri;
+  return raw.replace(/\s/g, "");
 }
 
 interface ChatCompletionResponse {
@@ -64,6 +65,37 @@ export async function chatCompletion(options: {
   }
 }
 
+const VISION_FALLBACK_MODELS = ["llava", "llava:7b", "llava:13b", "llava:7b-v1.5-q4_1"];
+
+async function visionRequest(
+  ollamaBase: string,
+  model: string,
+  prompt: string,
+  imagesBase64: string[],
+  signal: AbortSignal
+): Promise<string> {
+  const body = {
+    model,
+    stream: false,
+    messages: [
+      { role: "user" as const, content: prompt, images: imagesBase64 }
+    ]
+  };
+  const response = await fetch(`${ollamaBase}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Ollama vision ${response.status}: ${text.slice(0, 200)}`);
+  }
+  const data = (await response.json()) as { message?: { content?: string } };
+  const content = data.message?.content ?? "";
+  return content.trim();
+}
+
 /** Vision: распознавание картинок через нативный Ollama /api/chat (llava и т.п.) */
 export async function visionChatCompletion(options: {
   baseUrl: string;
@@ -77,35 +109,30 @@ export async function visionChatCompletion(options: {
   const ollamaBase = getOllamaBase(options.baseUrl);
   const imagesBase64 = options.images.map(dataUriToBase64);
 
-  const body = {
-    model: options.model,
-    stream: false,
-    messages: [
-      {
-        role: "user",
-        content: options.prompt,
-        images: imagesBase64
-      }
-    ]
-  };
+  const modelsToTry = [options.model, ...VISION_FALLBACK_MODELS.filter((m) => m !== options.model)];
 
-  try {
-    const response = await fetch(`${ollamaBase}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: controller.signal
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Ollama vision error ${response.status}: ${text}`);
+  let lastError: Error | null = null;
+  for (const model of modelsToTry) {
+    try {
+      const content = await visionRequest(
+        ollamaBase,
+        model,
+        options.prompt,
+        imagesBase64,
+        controller.signal
+      );
+      return content || "(пусто)";
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+      const isModelNotFound =
+        lastError.message.includes("404") ||
+        lastError.message.includes("model") ||
+        lastError.message.includes("not found");
+      if (!isModelNotFound) throw lastError;
     }
-
-    const data = (await response.json()) as { message?: { content?: string } };
-    const content = data.message?.content ?? "";
-    return content.trim();
-  } finally {
-    clearTimeout(timeout);
   }
+  clearTimeout(timeout);
+  throw new Error(
+    `Vision-модель не найдена. Установите: ollama pull llava`
+  );
 }

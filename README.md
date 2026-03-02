@@ -35,6 +35,7 @@ ollama pull llama3.1
 ollama pull mistral
 ollama pull qwen2.5
 ollama pull phi3
+ollama pull llava   # для распознавания картинок (OCR, объекты)
 ```
 
 ### Переменные окружения

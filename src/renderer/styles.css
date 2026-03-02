@@ -80,6 +80,9 @@ body {
   padding: 12px 20px;
   border-bottom: 1px solid var(--border);
   min-height: 48px;
+  position: relative;
+  z-index: 50;
+  background: var(--bg-primary);
 }
 
 .chat-topbar-spacer {

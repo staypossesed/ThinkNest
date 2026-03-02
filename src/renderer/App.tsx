@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type {
   AgentAnswer,
   AskResponse,
@@ -53,10 +54,13 @@ export default function App() {
   const answersRef = useRef<AgentAnswer[]>([]);
 
   const handleLocaleChange = (locale: UiLocale) => {
-    setUiLocale(locale);
     try {
       localStorage.setItem(LANG_STORAGE_KEY, locale);
     } catch {}
+    flushSync(() => setUiLocale(locale));
+    if (loading) {
+      window.api.setAskLocale(locale);
+    }
   };
 
   useEffect(() => {
@@ -174,9 +178,11 @@ export default function App() {
       return;
     }
 
-    const fallbackQuestion =
-      uiLocale === "zh" ? "描述图片内容" : uiLocale === "en" ? "Describe what's in the image" : "Опиши что на картинке";
-    const questionText = trimmed || fallbackQuestion;
+    const questionText =
+      trimmed ||
+      (attachedImages.length > 0
+        ? "[Изображение]"
+        : "");
     setLoading(true);
     setError(null);
 
