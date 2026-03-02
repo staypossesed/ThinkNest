@@ -228,39 +228,44 @@ export async function askQuestion(
   const aggStart = performance.now();
   const aggSystem =
     SYSTEM_OVERRIDE +
-    freedomInstruction +
     "\n\n" +
-    "Ты агрегатор. У тебя ответы от нескольких агентов на один вопрос. " +
+    "Ты судья соревнования. У тебя ответы от 4 агентов на один вопрос. " +
+    "Твоя задача: выбрать ОДИН лучший ответ. Не объединяй, не переписывай — выбери победителя. " +
     "Игнорируй ответы с текстом 'Ошибка агента'. " +
-    "Выбери лучшее из успешных ответов, объедини в один чёткий итог. Сохраняй мнения, допущения и фантазию агентов. " +
-    "В конце добавь блок: **Источники:** перечисли, какие агенты (Планировщик, Критик, Практик, Объяснитель) дали полезный вклад. " +
-    (webSources.length > 0
-      ? "Также укажи использованные веб-источники (URL) если они были задействованы. "
-      : "") +
-    (forecastMode
-      ? "Сохрани сценарии и оценки вероятности в итоге. "
-      : "") +
-    "Будь ясным, практичным, без воды.";
+    "Ответь СТРОГО в формате (две строки):\nПОБЕДИТЕЛЬ: [planner|critic|pragmatist|explainer]\nПРИЧИНА: [кратко почему этот ответ лучший]";
 
   try {
-    const final = await chatCompletion({
+    const judgeResponse = await chatCompletion({
       baseUrl: ollamaConfig.baseUrl,
       model: ollamaConfig.aggregatorModel,
       timeoutMs: ollamaConfig.timeoutMs,
-      temperature: 0.75,
+      temperature: 0.3,
       messages: [
         { role: "system", content: aggSystem },
         { role: "user", content: buildAggregationInput(question, answers) }
       ]
     });
 
+    const winnerId = parseWinnerId(judgeResponse);
+    const winner =
+      answers.find((a) => a.id === winnerId) ??
+      answers.find((a) => !a.content.startsWith("Ошибка агента:")) ??
+      answers[0];
+
+    const reason = parseWinnerReason(judgeResponse);
+    const finalContent =
+      `🏆 **Победитель: ${winner.title}** (модель: ${winner.model})\n\n` +
+      (reason ? `*Причина: ${reason}*\n\n` : "") +
+      "---\n\n" +
+      winner.content;
+
     const finalDuration = Math.round(performance.now() - aggStart);
 
     const response: AskResponse = {
       answers,
       final: {
-        content: final,
-        model: ollamaConfig.aggregatorModel,
+        content: finalContent,
+        model: winner.model,
         durationMs: finalDuration
       }
     };
@@ -270,14 +275,14 @@ export async function askQuestion(
     return response;
   } catch (error) {
     const finalDuration = Math.round(performance.now() - aggStart);
-    const fallback = answers.find((answer) => answer.content.trim())?.content ?? "";
+    const fallback = answers.find((a) => !a.content.startsWith("Ошибка агента:"));
     const resp: AskResponse = {
       answers,
       final: {
-        content:
-          fallback ||
-          "Агрегатор не смог сформировать ответ. Проверьте доступность Ollama.",
-        model: ollamaConfig.aggregatorModel,
+        content: fallback
+          ? `🏆 **Победитель: ${fallback.title}** (модель: ${fallback.model})\n\n---\n\n${fallback.content}`
+          : "Судья не смог выбрать победителя. Проверьте доступность Ollama.",
+        model: fallback?.model ?? ollamaConfig.aggregatorModel,
         durationMs: finalDuration
       }
     };
@@ -286,6 +291,29 @@ export async function askQuestion(
     }
     return resp;
   }
+}
+
+function parseWinnerId(judgeResponse: string): AgentId {
+  const m = judgeResponse.match(
+    /ПОБЕДИТЕЛЬ:\s*(planner|critic|pragmatist|explainer)/i
+  );
+  if (m) return m[1].toLowerCase() as AgentId;
+  const byName: Record<string, AgentId> = {
+    планировщик: "planner",
+    критик: "critic",
+    практик: "pragmatist",
+    объяснитель: "explainer"
+  };
+  const lower = judgeResponse.toLowerCase();
+  for (const [name, id] of Object.entries(byName)) {
+    if (lower.includes(name)) return id;
+  }
+  return "planner";
+}
+
+function parseWinnerReason(judgeResponse: string): string {
+  const m = judgeResponse.match(/ПРИЧИНА:\s*(.+?)(?:\n|$)/is);
+  return m?.[1]?.trim() ?? "";
 }
 
 function buildAggregationInput(question: string, answers: AgentAnswer[]): string {
