@@ -7,6 +7,7 @@ import {
   OnAgentAnswer,
   WebSource
 } from "../shared/types";
+import { extractTextFromImages } from "./ocr";
 import { chatCompletion, visionChatCompletion } from "./ollama";
 import { ollamaConfig } from "./config";
 import { searchWeb, formatWebContext } from "./webSearch";
@@ -108,6 +109,9 @@ async function normalizeAnswerLanguage(
   model: string
 ): Promise<string> {
   let text = fixCommonNonsense(content);
+  if (!ollamaConfig.llmLanguageRewrite) {
+    return text;
+  }
   if (lang === "zh") {
     const hasCjk = /[\u3400-\u9FFF]/.test(text);
     if (hasCjk && !/[А-Яа-яЁё]/.test(text)) return text;
@@ -174,6 +178,29 @@ async function runSequential<T, R>(
     results.push(await fn(item));
   }
   return results;
+}
+
+async function runWithConcurrency<T, R>(
+  items: T[],
+  fn: (item: T) => Promise<R>,
+  concurrency: number
+): Promise<R[]> {
+  if (items.length === 0) return [];
+  const max = Math.max(1, concurrency);
+  const out = new Array<R>(items.length);
+  let cursor = 0;
+
+  const worker = async () => {
+    while (true) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      out[i] = await fn(items[i]);
+    }
+  };
+
+  const pool = Array.from({ length: Math.min(max, items.length) }, () => worker());
+  await Promise.all(pool);
+  return out;
 }
 
 async function checkOllamaAvailable(baseUrl: string): Promise<void> {
@@ -278,6 +305,12 @@ export async function askQuestion(
       : lang === "zh"
         ? "\n\n严格回答问题。使用规范的中文，不要使用不存在的词。"
         : "\n\nAnswer STRICTLY the question. Proper grammar. No made-up words.";
+  const getCommonSenseInstruction = (lang: AnswerLang) =>
+    lang === "ru"
+      ? "\n\n[ВНИМАНИЕ] Прочитай вопрос буквально. Если звучит как загадка или каверзный вопрос — проверь точное значение слов. «Сколько месяцев имеют 28 дней» = все 12 (у каждого минимум 28). Не спеши с очевидным ответом."
+      : lang === "zh"
+        ? "\n\n[注意] 按字面理解问题。若像谜语或脑筋急转弯，检查措辞的精确含义。不要急于给出表面答案。"
+        : "\n\n[ATTENTION] Read the question literally. If it sounds like a riddle or trick question — check the exact meaning of words. «How many months have 28 days» = all 12 (each has at least 28). Don't rush to the obvious answer.";
   const conciseInstruction = directAnswerMode
     ? "\n\n[ФОРМАТ ОТВЕТА: КРАТКО] Без воды и длинных рассуждений. Максимум 3 коротких пункта: " +
       "1) Лучший вариант (или «нет единственного лучшего»), " +
@@ -288,13 +321,23 @@ export async function askQuestion(
 
   const prompts = getPrompts();
   const complexity = estimateQuestionComplexity(question);
-  const buildSystemPrompt = (agent: { systemPrompt: string; id: AgentId }) => {
+  const buildSystemPrompt = (agent: { systemPrompt: string; id: AgentId }, imgCtx: string) => {
     const lang = getAnswerLang();
     const forecastSuffix = forecastMode && agent.id === "planner" ? prompts.forecastSuffix : "";
+    const imageInstruction =
+      imgCtx.length > 0
+        ? (lang === "ru"
+            ? "\n\n[ИЗОБРАЖЕНИЕ] В сообщении есть блоки [ТЕКСТ С КАРТИНКИ (OCR)] и/или [ОПИСАНИЕ КАРТИНКИ] — полный анализ картинки. Ты НЕ видишь картинку, используй эти блоки. ЗАПРЕЩЕНО писать «не могу определить», «изображение недоступно» — отвечай на основе контекста выше."
+            : lang === "zh"
+              ? "\n\n[图片] 消息中有[图片文字(OCR)]和/或[图片描述]块。你看不到图片，请使用这些块。禁止写「无法确定」「图片不可用」——根据上文回答。"
+              : "\n\n[IMAGE] Message has [ТЕКСТ С КАРТИНКИ (OCR)] and/or [ОПИСАНИЕ КАРТИНКИ] blocks. You don't see the image, use them. FORBIDDEN: «cannot determine», «image unavailable» — answer from context above.")
+        : "";
     return (
       SYSTEM_OVERRIDE +
       freedomInstruction +
       getLanguageInstruction(lang) +
+      getCommonSenseInstruction(lang) +
+      imageInstruction +
       webInstruction +
       getFocusInstruction(lang) +
       conciseInstruction +
@@ -318,31 +361,56 @@ export async function askQuestion(
   let imageContext = "";
   const images = request.images?.filter((s) => s?.startsWith("data:image/")) ?? [];
   if (images.length > 0) {
+    // 1. Tesseract OCR — быстрый и надёжный для текста (локально, без Ollama)
+    let ocrText = "";
     try {
+      ocrText = await extractTextFromImages(images, "rus+eng");
+    } catch {
+      // OCR не критичен — продолжаем с vision
+    }
+
+    // 2. Vision (llava) — объекты/сцена. Если OCR уже дал текст, по умолчанию пропускаем vision.
+    let visionText = "";
+    if (!ocrText || !ollamaConfig.skipVisionIfOcr) {
+      try {
       const visionPrompt =
         getAnswerLang() === "ru"
-          ? "Проанализируй изображение полностью. Укажи: 1) Объекты, сцену, людей. 2) Весь видимый текст (OCR). 3) Что, по-твоему, хотел передать автор. Может быть и объект, и текст, и то и другое. Структурированно."
+          ? "Опиши изображение: объекты, сцену, людей. Текст на картинке уже извлечён отдельно — не дублируй."
           : getAnswerLang() === "zh"
-            ? "全面分析图片。包括：1) 物体、场景、人物。2) 所有可见文字（OCR）。3) 作者可能想表达什么。可能是物体、文字或两者。有条理。"
-            : "Analyze the image fully. Include: 1) Objects, scene, people. 2) All visible text (OCR). 3) What the author might be trying to convey. Could be object, text, or both. Be structured.";
-      imageContext = await visionChatCompletion({
+            ? "描述图片：物体、场景、人物。文字已单独提取，勿重复。"
+            : "Describe the image: objects, scene, people. Text already extracted separately.";
+      visionText = await visionChatCompletion({
         baseUrl: ollamaConfig.baseUrl,
         model: ollamaConfig.visionModel,
         prompt: visionPrompt,
         images,
-        timeoutMs: Math.min(60000, ollamaConfig.timeoutMs)
+        timeoutMs: ollamaConfig.visionTimeoutMs
       });
-      if (imageContext) {
-        imageContext = `[ОПИСАНИЕ КАРТИНКИ]\n${imageContext}\n\n---\n`;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "unknown";
+        if (ocrText) {
+          // Есть OCR — работаем без vision
+          visionText = "(объекты и сцена не распознаны — используй текст выше)";
+        } else {
+          if (msg.includes("Vision-модель") || msg.includes("ollama pull")) throw new Error(msg);
+          if (msg.includes("aborted") || msg.includes("abort")) {
+            throw new Error(
+              "Таймаут распознавания картинки. Llava загружается долго — подождите и попробуйте снова. Убедитесь, что Ollama запущен."
+            );
+          }
+          throw new Error(
+            `Не удалось распознать картинку: ${msg}. Установите vision-модель: ollama pull llava`
+          );
+        }
       }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "unknown";
-      throw new Error(
-        msg.includes("Vision-модель") || msg.includes("ollama pull")
-          ? msg
-          : `Не удалось распознать картинку: ${msg}. Установите vision-модель: ollama pull llava`
-      );
+    } else {
+      visionText = "(ocr-режим: анализ по тексту с картинки, без vision)";
     }
+
+    const parts: string[] = [];
+    if (ocrText) parts.push(`[ТЕКСТ С КАРТИНКИ (OCR)]\n${ocrText}`);
+    if (visionText) parts.push(`[ОПИСАНИЕ КАРТИНКИ]\n${visionText}`);
+    if (parts.length > 0) imageContext = parts.join("\n\n---\n\n") + "\n\n---\n";
   }
 
   const isImageOnly = question === "[Изображение]" && imageContext.length > 0;
@@ -373,7 +441,7 @@ export async function askQuestion(
   ): Promise<AgentAnswer> => {
     const start = performance.now();
     const model = agent.model;
-    const timeoutMs = ollamaConfig.timeoutMs + 60000;
+    const timeoutMs = ollamaConfig.timeoutMs;
     try {
       const rawContent = await chatCompletion({
         baseUrl: ollamaConfig.baseUrl,
@@ -382,7 +450,7 @@ export async function askQuestion(
         temperature: agent.temperature ?? 0.6,
         numPredict: agent.numPredict,
         messages: [
-          { role: "system", content: buildSystemPrompt(agent) },
+          { role: "system", content: buildSystemPrompt(agent, imageContext) },
           { role: "user", content: userContent }
         ]
       });
@@ -435,7 +503,7 @@ export async function askQuestion(
 
   const answers = ollamaConfig.sequentialAgents
     ? await runSequential(activeAgents, runAgent)
-    : await Promise.all(activeAgents.map(runAgent));
+    : await runWithConcurrency(activeAgents, runAgent, ollamaConfig.agentConcurrency);
 
   const aggStart = performance.now();
   const judgeModeHint = isFactualMode

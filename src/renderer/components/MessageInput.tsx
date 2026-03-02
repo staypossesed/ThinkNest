@@ -1,4 +1,6 @@
 import { useRef } from "react";
+import type { UiLocale } from "./LanguageSelector";
+import { t } from "../i18n";
 
 const MAX_IMAGES = 4;
 const MAX_IMAGE_SIZE_MB = 10;
@@ -8,6 +10,8 @@ interface MessageInputProps {
   onChange: (v: string) => void;
   onSubmit: () => void;
   loading: boolean;
+  /** Показывать подсказку «Генерация в другом чате» */
+  loadingInOtherChat?: boolean;
   disabled: boolean;
   useWebData: boolean;
   forecastMode: boolean;
@@ -18,12 +22,13 @@ interface MessageInputProps {
   placeholder?: string;
   images?: string[];
   onImagesChange?: (images: string[]) => void;
+  uiLocale: UiLocale;
 }
 
-function fileToDataUri(file: File): Promise<string> {
+function fileToDataUri(file: File, locale: UiLocale): Promise<string> {
   return new Promise((resolve, reject) => {
     if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
-      reject(new Error(`Файл слишком большой (макс. ${MAX_IMAGE_SIZE_MB} МБ)`));
+      reject(new Error(t(locale, "fileTooBig", { max: String(MAX_IMAGE_SIZE_MB) })));
       return;
     }
     const reader = new FileReader();
@@ -39,6 +44,7 @@ export default function MessageInput(props: MessageInputProps) {
     onChange,
     onSubmit,
     loading,
+    loadingInOtherChat = false,
     disabled,
     useWebData,
     forecastMode,
@@ -48,7 +54,8 @@ export default function MessageInput(props: MessageInputProps) {
     error,
     placeholder = "",
     images = [],
-    onImagesChange
+    onImagesChange,
+    uiLocale
   } = props;
 
   const canSubmit = value.trim() || images.length > 0;
@@ -62,12 +69,12 @@ export default function MessageInput(props: MessageInputProps) {
     try {
       const newUris: string[] = [];
       for (let i = 0; i < toAdd; i++) {
-        const uri = await fileToDataUri(files[i]);
+        const uri = await fileToDataUri(files[i], uiLocale);
         if (uri.startsWith("data:image/")) newUris.push(uri);
       }
       onImagesChange([...images, ...newUris].slice(0, MAX_IMAGES));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Ошибка загрузки";
+      const msg = err instanceof Error ? err.message : t(uiLocale, "uploadError");
       onChange(value + (value ? "\n" : "") + `[${msg}]`);
     }
     e.target.value = "";
@@ -87,7 +94,7 @@ export default function MessageInput(props: MessageInputProps) {
             onChange={(e) => onUseWebDataChange(e.target.checked)}
             disabled={loading}
           />
-          <span>Use Web Data</span>
+          <span>{t(uiLocale, "useWebData")}</span>
         </label>
         <label className="chip">
           <input
@@ -96,7 +103,7 @@ export default function MessageInput(props: MessageInputProps) {
             onChange={(e) => onForecastModeChange(e.target.checked)}
             disabled={loading}
           />
-          <span>Прогноз</span>
+          <span>{t(uiLocale, "forecast")}</span>
         </label>
         <input
           ref={fileInputRef}
@@ -112,9 +119,9 @@ export default function MessageInput(props: MessageInputProps) {
           className="chip message-input-attach"
           onClick={() => fileInputRef.current?.click()}
           disabled={loading || disabled || images.length >= MAX_IMAGES}
-          title="Прикрепить картинку"
+          title={t(uiLocale, "attachImage")}
         >
-          📷 Картинка
+          📷 {t(uiLocale, "image")}
         </button>
       </div>
       {images.length > 0 && (
@@ -122,12 +129,15 @@ export default function MessageInput(props: MessageInputProps) {
           {images.map((uri, i) => (
             <div key={i} className="message-input-preview">
               <img src={uri} alt="" />
-              <button type="button" onClick={() => removeImage(i)} aria-label="Удалить">
+              <button type="button" onClick={() => removeImage(i)} aria-label={t(uiLocale, "delete")}>
                 ×
               </button>
             </div>
           ))}
         </div>
+      )}
+      {loadingInOtherChat && (
+        <p className="message-input-loading-other">{t(uiLocale, "loadingInOtherChat")}</p>
       )}
       <div className="message-input-row">
         <textarea
@@ -149,12 +159,12 @@ export default function MessageInput(props: MessageInputProps) {
           disabled={disabled || loading || !canSubmit}
           className="message-input-submit"
         >
-          {loading ? statusText || "..." : "Отправить"}
+          {loading ? statusText || "..." : t(uiLocale, "submit")}
         </button>
       </div>
       {error && <div className="message-input-error">{error}</div>}
       <p className="message-input-hint">
-        Важно: ответы по юридическим вопросам носят информационный характер и не заменяют консультацию юриста.
+        {t(uiLocale, "legalHint")}
       </p>
     </div>
   );

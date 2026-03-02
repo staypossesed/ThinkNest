@@ -27,6 +27,9 @@ debug-*.log
 npm-debug.log*
 eval-*-report*.json
 
+# OCR runtime artifacts
+*.traineddata
+
 # OS/editor
 .DS_Store
 Thumbs.db

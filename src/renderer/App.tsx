@@ -13,6 +13,7 @@ import MessageInput from "./components/MessageInput";
 import LanguageSelector, { type UiLocale } from "./components/LanguageSelector";
 import { useConversations } from "./hooks/useConversations";
 import { usePlaceholder } from "./hooks/usePlaceholder";
+import { t } from "./i18n";
 
 const LANG_STORAGE_KEY = "thinknest_ui_locale";
 
@@ -25,17 +26,11 @@ function detectSystemLocale(): UiLocale {
 }
 
 const agentOrder = ["planner", "critic", "pragmatist", "explainer"] as const;
-const agentLabels: Record<(typeof agentOrder)[number], string> = {
-  planner: "Планировщик",
-  critic: "Критик",
-  pragmatist: "Практик",
-  explainer: "Объяснитель"
-};
 
 export default function App() {
   const [question, setQuestion] = useState("");
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loadingConversationIds, setLoadingConversationIds] = useState<Set<string>>(new Set());
   const [useWebData, setUseWebData] = useState(false);
   const [forecastMode, setForecastMode] = useState(false);
   const [session, setSession] = useState<SessionState>({ token: null, user: null });
@@ -52,6 +47,21 @@ export default function App() {
   });
 
   const answersRef = useRef<AgentAnswer[]>([]);
+
+  const {
+    conversations,
+    activeId,
+    activeConversation,
+    createConversationWithFirstMessage,
+    addMessagePlaceholder,
+    updateMessage,
+    selectConversation,
+    deleteConversation,
+    newChat
+  } = useConversations(devMode);
+
+  const loading = loadingConversationIds.size > 0;
+  const isLoadingInCurrentChat = activeId != null && loadingConversationIds.has(activeId);
 
   const handleLocaleChange = (locale: UiLocale) => {
     try {
@@ -74,34 +84,27 @@ export default function App() {
     } catch {}
   }, [session.user?.locale]);
 
-  const {
-    conversations,
-    activeId,
-    activeConversation,
-    createConversationWithFirstMessage,
-    addMessagePlaceholder,
-    updateMessage,
-    selectConversation,
-    deleteConversation,
-    newChat
-  } = useConversations(devMode);
-
   const messages = activeConversation?.messages ?? [];
   const maxAgents = entitlements?.maxAgents ?? 4;
   const inputPlaceholder = usePlaceholder(uiLocale);
 
   const statusText = useMemo(() => {
     if (!loading) return "";
-    if (messages.length === 0) return "Планировщик отвечает...";
+    if (!isLoadingInCurrentChat) return t(uiLocale, "loadingInOtherChat");
+    if (messages.length === 0) return t(uiLocale, "plannerResponds");
     const last = messages[messages.length - 1];
     const count = last?.answers.length ?? 0;
-    if (count >= maxAgents) return "Формирую итог...";
-    return `${agentLabels[agentOrder[count]]} отвечает...`;
-  }, [loading, messages, maxAgents]);
+    if (count >= maxAgents) return t(uiLocale, "formingResult");
+    return `${t(uiLocale, agentOrder[count])} ${t(uiLocale, "agentResponds")}`;
+  }, [loading, isLoadingInCurrentChat, messages, maxAgents, uiLocale]);
 
   useEffect(() => {
     const bootstrap = async () => {
       try {
+        if (typeof window.api === "undefined") {
+          setError("Electron API недоступен. Перезапустите приложение.");
+          return;
+        }
         const isDev = await window.api.isDevMode();
         setDevMode(isDev);
         const currentSession = await window.api.getSession();
@@ -112,7 +115,7 @@ export default function App() {
         }
       } catch (err) {
         const message =
-          err instanceof Error ? err.message : "Не удалось загрузить сессию.";
+          err instanceof Error ? err.message : t(uiLocale, "loadSessionFailed");
         setError(message);
       } finally {
         setLoadingSession(false);
@@ -134,7 +137,7 @@ export default function App() {
       setSession(nextSession);
       await refreshEntitlements();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Ошибка входа через Google.";
+      const message = err instanceof Error ? err.message : t(uiLocale, "loginFailed");
       setError(message);
     } finally {
       setLoadingSession(false);
@@ -153,7 +156,7 @@ export default function App() {
     try {
       await window.api.openCheckout();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Не удалось открыть оплату.";
+      const message = err instanceof Error ? err.message : t(uiLocale, "checkoutFailed");
       setError(message);
     }
   };
@@ -164,7 +167,7 @@ export default function App() {
       await window.api.openPortal();
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Не удалось открыть управление подпиской.";
+        err instanceof Error ? err.message : t(uiLocale, "portalFailed");
       setError(message);
     }
   };
@@ -172,9 +175,9 @@ export default function App() {
   const submit = async () => {
     const trimmed = question.trim();
     const hasContent = trimmed || attachedImages.length > 0;
-    if (!hasContent || loading) return;
+    if (!hasContent || isLoadingInCurrentChat) return;
     if (!devMode && !session.token) {
-      setError("Сначала войдите через Google.");
+      setError(t(uiLocale, "loginFirst"));
       return;
     }
 
@@ -183,8 +186,10 @@ export default function App() {
       (attachedImages.length > 0
         ? "[Изображение]"
         : "");
-    setLoading(true);
+    const imagesToSend = attachedImages.length > 0 ? attachedImages : undefined;
     setError(null);
+    setQuestion("");
+    setAttachedImages([]);
 
     let conv: { id: string };
     let placeholder: ConversationMessage;
@@ -192,7 +197,7 @@ export default function App() {
       const result = createConversationWithFirstMessage(questionText, {
         useWebData,
         forecastMode,
-        images: attachedImages.length > 0 ? attachedImages : undefined
+        images: imagesToSend
       });
       conv = result.conv;
       placeholder = result.placeholder;
@@ -201,18 +206,23 @@ export default function App() {
       placeholder = addMessagePlaceholder(conv.id, questionText, {
         useWebData,
         forecastMode,
-        images: attachedImages.length > 0 ? attachedImages : undefined
+        images: imagesToSend
       });
     }
 
+    setLoadingConversationIds((prev) => new Set([...prev, conv.id]));
     answersRef.current = [];
 
     try {
       const canAsk = await window.api.canAsk();
       setEntitlements(canAsk.entitlements);
       if (!canAsk.allowed) {
-        setError(canAsk.reason ?? "Лимит исчерпан. Обновите план до Pro.");
-        setLoading(false);
+        setError(canAsk.reason ?? t(uiLocale, "limitExceeded"));
+        setLoadingConversationIds((prev) => {
+          const next = new Set(prev);
+          next.delete(conv.id);
+          return next;
+        });
         return;
       }
 
@@ -225,7 +235,7 @@ export default function App() {
           useWebData,
           forecastMode,
           preferredLocale,
-          images: attachedImages.length > 0 ? attachedImages : undefined
+          images: imagesToSend
         },
         (answer: AgentAnswer) => {
           answersRef.current = answersRef.current.filter((a) => a.id !== answer.id);
@@ -247,14 +257,16 @@ export default function App() {
 
       const usage = await window.api.consumeUsage(questionText);
       setEntitlements(usage.entitlements);
-      setQuestion("");
-      setAttachedImages([]);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Не удалось получить ответ.";
+        err instanceof Error ? err.message : t(uiLocale, "askFailed");
       setError(message);
     } finally {
-      setLoading(false);
+      setLoadingConversationIds((prev) => {
+        const next = new Set(prev);
+        next.delete(conv.id);
+        return next;
+      });
     }
   };
 
@@ -282,6 +294,7 @@ export default function App() {
         onManageBilling={handleManageBilling}
         onRefreshPlan={refreshEntitlements}
         loadingSession={loadingSession}
+        uiLocale={uiLocale}
       />
       <main className="app-main">
         <div className="chat-topbar">
@@ -290,15 +303,17 @@ export default function App() {
         </div>
         <ChatMain
           messages={messages}
-          loading={loading}
+          loading={isLoadingInCurrentChat}
           maxAgents={maxAgents}
+          uiLocale={uiLocale}
         />
         <div className="app-input-wrap">
           <MessageInput
             value={question}
             onChange={setQuestion}
             onSubmit={submit}
-            loading={loading}
+            loading={isLoadingInCurrentChat}
+            loadingInOtherChat={loading && !isLoadingInCurrentChat}
             disabled={!devMode && !session.token}
             useWebData={useWebData}
             forecastMode={forecastMode}
@@ -309,6 +324,7 @@ export default function App() {
             placeholder={inputPlaceholder}
             images={attachedImages}
             onImagesChange={setAttachedImages}
+            uiLocale={uiLocale}
           />
         </div>
       </main>

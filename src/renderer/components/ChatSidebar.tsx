@@ -1,5 +1,11 @@
+import { useState } from "react";
+import { createPortal } from "react-dom";
 import logo from "../assets/logo.svg";
 import type { Conversation, SessionState, Entitlements } from "../../shared/types";
+import type { UiLocale } from "./LanguageSelector";
+import { t } from "../i18n";
+
+const DONT_ASK_DELETE_KEY = "thinknest_dont_ask_delete";
 
 interface ChatSidebarProps {
   conversations: Conversation[];
@@ -16,16 +22,18 @@ interface ChatSidebarProps {
   onManageBilling: () => void;
   onRefreshPlan: () => void;
   loadingSession: boolean;
+  uiLocale: UiLocale;
 }
 
-function formatDate(ts: number): string {
+function formatDate(ts: number, locale: UiLocale): string {
   const d = new Date(ts);
   const now = new Date();
   const diff = now.getTime() - d.getTime();
-  if (diff < 60000) return "Только что";
-  if (diff < 3600000) return `${Math.floor(diff / 60000)} мин`;
-  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+  const loc = locale === "ru" ? "ru-RU" : locale === "zh" ? "zh-CN" : "en-US";
+  if (diff < 60000) return t(locale, "justNow");
+  if (diff < 3600000) return `${Math.floor(diff / 60000)} ${t(locale, "min")}`;
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString(loc, { day: "numeric", month: "short" });
 }
 
 function getPreview(question: string, maxLen = 40): string {
@@ -47,13 +55,42 @@ export default function ChatSidebar({
   onUpgrade,
   onManageBilling,
   onRefreshPlan,
-  loadingSession
+  loadingSession,
+  uiLocale
 }: ChatSidebarProps) {
+  const [deleteModal, setDeleteModal] = useState<{ id: string } | null>(null);
+  const [dontAskAgain, setDontAskAgain] = useState(false);
+
   const profileName = session.user
     ? session.user.fullName?.trim()
       ? session.user.fullName.trim().split(/\s+/)[0]
       : session.user.email.split("@")[0]
     : "Guest";
+
+  const handleDeleteClick = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    try {
+      if (localStorage.getItem(DONT_ASK_DELETE_KEY) === "1") {
+        onDelete(id);
+        return;
+      }
+    } catch {}
+    setDeleteModal({ id });
+    setDontAskAgain(false);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteModal) return;
+    try {
+      if (dontAskAgain) localStorage.setItem(DONT_ASK_DELETE_KEY, "1");
+    } catch {}
+    onDelete(deleteModal.id);
+    setDeleteModal(null);
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteModal(null);
+  };
 
   return (
     <aside className="chat-sidebar">
@@ -62,32 +99,36 @@ export default function ChatSidebar({
         <span className="chat-sidebar-title">ThinkNest</span>
       </div>
       <button type="button" className="chat-sidebar-new" onClick={onNewChat}>
-        + Новый чат
+        {t(uiLocale, "newChatBtn")}
       </button>
       <div className="chat-sidebar-list">
         {conversations.map((c) => (
           <div
             key={c.id}
+            role="button"
+            tabIndex={0}
             className={`chat-sidebar-item ${c.id === activeId ? "chat-sidebar-item--active" : ""}`}
+            onClick={() => onSelect(c.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect(c.id);
+              }
+            }}
           >
-            <button
-              type="button"
-              className="chat-sidebar-item-btn"
-              onClick={() => onSelect(c.id)}
-            >
-              {getPreview(c.messages[0]?.question ?? "Новый чат")}
-            </button>
-            <span className="chat-sidebar-item-date">
-              {formatDate(c.updatedAt)}
-            </span>
+            <div className="chat-sidebar-item-content">
+              <span className="chat-sidebar-item-preview">
+                {getPreview(c.messages[0]?.question ?? t(uiLocale, "newChat"))}
+              </span>
+              <span className="chat-sidebar-item-date">
+                {formatDate(c.updatedAt, uiLocale)}
+              </span>
+            </div>
             <button
               type="button"
               className="chat-sidebar-item-delete"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(c.id);
-              }}
-              aria-label="Удалить"
+              onClick={(e) => handleDeleteClick(e, c.id)}
+              aria-label={t(uiLocale, "delete")}
             >
               ×
             </button>
@@ -109,20 +150,20 @@ export default function ChatSidebar({
             )}
             <div className="chat-sidebar-actions">
               <button type="button" onClick={onRefreshPlan}>
-                Refresh
+                {t(uiLocale, "refresh")}
               </button>
               {entitlements?.plan === "free" && (
                 <button type="button" onClick={onUpgrade}>
-                  Pro
+                  {t(uiLocale, "pro")}
                 </button>
               )}
               {entitlements?.plan === "pro" && (
                 <button type="button" onClick={onManageBilling}>
-                  Billing
+                  {t(uiLocale, "billing")}
                 </button>
               )}
               <button type="button" onClick={onLogout}>
-                Выйти
+                {t(uiLocale, "logout")}
               </button>
             </div>
           </>
@@ -133,10 +174,50 @@ export default function ChatSidebar({
             disabled={loadingSession}
             className="chat-sidebar-login"
           >
-            {loadingSession ? "..." : "Войти через Google"}
+            {loadingSession ? t(uiLocale, "loginGoogleLoading") : t(uiLocale, "loginGoogle")}
           </button>
         )}
       </div>
+
+      {deleteModal &&
+        createPortal(
+          <div
+            className="delete-confirm-overlay"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                e.preventDefault();
+                handleCancelDelete();
+              }
+            }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-confirm-title"
+          >
+            <div className="delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+              <h3 id="delete-confirm-title" className="delete-confirm-title">
+                {t(uiLocale, "deleteConfirmTitle")}
+              </h3>
+              <p className="delete-confirm-text">{t(uiLocale, "deleteConfirmText")}</p>
+              <label className="delete-confirm-dont-ask">
+                <input
+                  type="checkbox"
+                  checked={dontAskAgain}
+                  onChange={(e) => setDontAskAgain(e.target.checked)}
+                />
+                <span>{t(uiLocale, "dontAskAgain")}</span>
+              </label>
+              <div className="delete-confirm-actions">
+                <button type="button" className="delete-confirm-cancel" onClick={handleCancelDelete}>
+                  {t(uiLocale, "cancel")}
+                </button>
+                <button type="button" className="delete-confirm-ok" onClick={handleConfirmDelete}>
+                  {t(uiLocale, "confirm")}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </aside>
   );
 }

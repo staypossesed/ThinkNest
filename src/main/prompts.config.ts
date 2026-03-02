@@ -11,30 +11,30 @@ const DEFAULT_AGENTS: AgentPromptConfig[] = [
     id: "planner",
     title: "Планировщик",
     model: ollamaConfig.agents.planner,
-    numPredict: 320,
-    systemPrompt: DEFAULT_BASE + "\n\n[РОЛЬ: Планировщик] Дай структурированный план."
+    numPredict: 120,
+    systemPrompt: DEFAULT_BASE + "\n\n[РОЛЬ: Планировщик] Дай краткий план, 2–3 пункта."
   },
   {
     id: "critic",
     title: "Критик",
     model: ollamaConfig.agents.critic,
-    numPredict: 260,
-    systemPrompt: DEFAULT_BASE + "\n\n[РОЛЬ: Критик] Проверь факты, укажи слабые места."
+    numPredict: 100,
+    systemPrompt: DEFAULT_BASE + "\n\n[РОЛЬ: Критик] Проверь факты, 1–2 замечания."
   },
   {
     id: "pragmatist",
     title: "Практик",
     model: ollamaConfig.agents.pragmatist,
-    numPredict: 220,
-    systemPrompt: DEFAULT_BASE + "\n\n[РОЛЬ: Практик] Дай прикладной ответ."
+    numPredict: 100,
+    systemPrompt: DEFAULT_BASE + "\n\n[РОЛЬ: Практик] Дай прикладной ответ кратко."
   },
   {
     id: "explainer",
     title: "Объяснитель",
     model: ollamaConfig.agents.explainer,
-    numPredict: 180,
+    numPredict: 80,
     temperature: 0.3,
-    systemPrompt: DEFAULT_BASE + "\n\n[РОЛЬ: Объяснитель] Объясни простыми словами."
+    systemPrompt: DEFAULT_BASE + "\n\n[РОЛЬ: Объяснитель] Объясни в 1–2 предложениях."
   }
 ];
 

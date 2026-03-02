@@ -1,8 +1,10 @@
 import { useEffect, useRef } from "react";
 import type { AgentId, ConversationMessage } from "../../shared/types";
+import type { UiLocale } from "./LanguageSelector";
 import AgentCard from "./AgentCard";
 import FinalAnswer from "./FinalAnswer";
 import SkeletonAgent from "./SkeletonAgent";
+import { t } from "../i18n";
 
 const agentOrder: AgentId[] = ["planner", "critic", "pragmatist", "explainer"];
 
@@ -11,13 +13,15 @@ interface ChatMainProps {
   loading: boolean;
   maxAgents: number;
   scrollToBottom?: boolean;
+  uiLocale: UiLocale;
 }
 
 export default function ChatMain({
   messages,
   loading,
   maxAgents,
-  scrollToBottom = true
+  scrollToBottom = true,
+  uiLocale
 }: ChatMainProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -31,8 +35,8 @@ export default function ChatMain({
     return (
       <div className="chat-main chat-main--empty">
         <div className="chat-main-welcome">
-          <h2>Multi Agent Desktop</h2>
-          <p>4 эксперта отвечают на ваш вопрос. Задайте вопрос или начните новый чат.</p>
+          <h2>{t(uiLocale, "welcomeTitle")}</h2>
+          <p>{t(uiLocale, "welcomeText")}</p>
         </div>
       </div>
     );
@@ -54,12 +58,12 @@ export default function ChatMain({
               {msg.question}
             </div>
             <div className="message-bubble message-bubble--ai">
-              <div className="ai-block-header">4 эксперта отвечают</div>
+              <div className="ai-block-header">{t(uiLocale, "expertsRespond")}</div>
               <div className="ai-block-agents">
                 {agentOrder.slice(0, maxAgents).map((agentId) => {
                   const answer = msg.answers.find((a) => a.id === agentId);
                   if (answer) {
-                    return <AgentCard key={agentId} answer={answer} />;
+                    return <AgentCard key={agentId} answer={answer} uiLocale={uiLocale} />;
                   }
                   const isLastAndLoading = msg === messages[messages.length - 1] && loading;
                   return isLastAndLoading ? (
@@ -68,12 +72,12 @@ export default function ChatMain({
                 })}
               </div>
               {msg.final ? (
-                <FinalAnswer final={msg.final} webSources={msg.webSources} />
+                <FinalAnswer final={msg.final} webSources={msg.webSources} uiLocale={uiLocale} />
               ) : (
                 msg === messages[messages.length - 1] &&
                 loading &&
                 msg.answers.length >= maxAgents && (
-                  <div className="final-answer-loading">Формирую итог...</div>
+                  <div className="final-answer-loading">{t(uiLocale, "formingResult")}</div>
                 )
               )}
             </div>

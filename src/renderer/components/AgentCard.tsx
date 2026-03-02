@@ -2,6 +2,8 @@ import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { AgentAnswer } from "../../shared/types";
+import type { UiLocale } from "./LanguageSelector";
+import { t } from "../i18n";
 
 const agentColors: Record<string, string> = {
   planner: "var(--agent-planner)",
@@ -20,7 +22,7 @@ function getVerdictPreview(content: string, maxLen = 100): string {
   return first.length <= maxLen ? first : first.slice(0, maxLen) + "…";
 }
 
-export default function AgentCard({ answer }: { answer: AgentAnswer }) {
+export default function AgentCard({ answer, uiLocale }: { answer: AgentAnswer; uiLocale: UiLocale }) {
   const [expanded, setExpanded] = useState(false);
   const color = agentColors[answer.id] ?? "var(--accent)";
 
@@ -30,7 +32,7 @@ export default function AgentCard({ answer }: { answer: AgentAnswer }) {
         <div className="agent-card-avatar" style={{ background: color }} />
         <div className="agent-card-meta">
           <span className="agent-card-name">{answer.title}</span>
-          <span className="agent-card-model">{answer.model} • {answer.durationMs} мс</span>
+          <span className="agent-card-model">{answer.model} • {answer.durationMs} {t(uiLocale, "ms")}</span>
         </div>
       </div>
       <button
