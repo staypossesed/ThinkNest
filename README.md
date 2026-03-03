@@ -86,20 +86,18 @@ npm run dev
 
 ## 4) Настройка Stripe
 
-1. Создай Product `Pro` и monthly Price в Stripe.
-2. Добавь в `backend/.env`:
+1. **Stripe Dashboard:** Products -> Create "Pro" -> Add Price (monthly recurring). Скопируй Price ID (`price_xxx`).
+2. **API keys:** Developers -> API keys -> Secret key.
+3. **Webhook:** Developers -> Webhooks -> Add endpoint `POST https://<your-backend-domain>/webhooks/stripe`
+   - События: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed` (опционально)
+   - Скопируй Signing secret в `STRIPE_WEBHOOK_SECRET`
+4. **Customer Portal:** Billing -> Customer portal — включи для отмены/обновления подписки.
+5. Добавь в `backend/.env`:
    - `STRIPE_SECRET_KEY`
+   - `STRIPE_WEBHOOK_SECRET`
    - `STRIPE_PRICE_PRO_MONTHLY`
-   - `STRIPE_SUCCESS_URL`
-   - `STRIPE_CANCEL_URL`
-3. Создай webhook endpoint:
-   - `POST https://<your-backend-domain>/webhooks/stripe`
-4. Подпишись минимум на события:
-   - `checkout.session.completed`
-   - `customer.subscription.created`
-   - `customer.subscription.updated`
-   - `customer.subscription.deleted`
-5. Добавь `STRIPE_WEBHOOK_SECRET` в `backend/.env`.
+   - `STRIPE_SUCCESS_URL` (куда вернуть после успешной оплаты)
+   - `STRIPE_CANCEL_URL` (куда вернуть при отмене)
 
 ## 5) Деплой backend на Railway
 
