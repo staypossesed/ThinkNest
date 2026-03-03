@@ -17,8 +17,10 @@ import { useConversations } from "./hooks/useConversations";
 import { usePlaceholder } from "./hooks/usePlaceholder";
 import { useMemory } from "./hooks/useMemory";
 import { t } from "./i18n";
+import { isWebMode } from "./webApi";
 
 const ONBOARDING_DONE_KEY = "thinknest_onboarding_done";
+const MODE_STORAGE_KEY = "thinknest_mode";
 
 const LANG_STORAGE_KEY = "thinknest_ui_locale";
 
@@ -39,9 +41,12 @@ export default function App() {
   const [useWebData, setUseWebData] = useState(false);
   const [forecastMode, setForecastMode] = useState(false);
   const [deepResearchMode, setDeepResearchMode] = useState(false);
-  const [debateMode, setDebateMode] = useState(false);
   const [expertProfile, setExpertProfile] = useState("");
   const [showMemoryPanel, setShowMemoryPanel] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem("thinknest_sidebar_collapsed") === "1"; } catch { return false; }
+  });
   const [session, setSession] = useState<SessionState>({ token: null, user: null });
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
   const [loadingSession, setLoadingSession] = useState(true);
@@ -50,7 +55,7 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(() => {
     try { return !localStorage.getItem(ONBOARDING_DONE_KEY); } catch { return false; }
   });
-  const { memoryContext } = useMemory();
+  const { memory, setMemory, memoryContext } = useMemory();
   const [uiLocale, setUiLocale] = useState<UiLocale>(() => {
     try {
       const s = localStorage.getItem(LANG_STORAGE_KEY);
@@ -82,7 +87,7 @@ export default function App() {
       localStorage.setItem(LANG_STORAGE_KEY, locale);
     } catch {}
     flushSync(() => setUiLocale(locale));
-    if (loading) {
+    if (loading && window.api?.setAskLocale) {
       window.api.setAskLocale(locale);
     }
   };
@@ -116,7 +121,7 @@ export default function App() {
     const bootstrap = async () => {
       try {
         if (typeof window.api === "undefined") {
-          setError("Electron API недоступен. Перезапустите приложение.");
+          setError("API недоступен. Перезапустите приложение.");
           return;
         }
         const isDev = await window.api.isDevMode();
@@ -244,17 +249,26 @@ export default function App() {
       }
 
       const preferredLocale: "ru" | "en" | "zh" = uiLocale;
+      const ent = canAsk.entitlements;
 
+      const mode = (() => {
+        try {
+          const m = localStorage.getItem(MODE_STORAGE_KEY);
+          if (m === "fast" || m === "balanced" || m === "quality") return m;
+        } catch {}
+        return "balanced";
+      })();
       const response = await window.api.ask(
         {
           question: questionText,
-          maxAgents: canAsk.entitlements.maxAgents,
-          useWebData,
-          forecastMode,
+          maxAgents: ent.maxAgents,
+          mode,
+          useWebData: useWebData && (ent.allowWebData !== false),
+          forecastMode: forecastMode && (ent.allowForecast !== false),
           deepResearchMode,
-          debateMode,
-          expertProfile: expertProfile || undefined,
-          memoryContext: memoryContext || undefined,
+          debateMode: true,
+          expertProfile: (ent.allowExpertProfile !== false && expertProfile) ? expertProfile : undefined,
+          memoryContext: (ent.allowMemory !== false && memoryContext) ? memoryContext : undefined,
           preferredLocale,
           images: imagesToSend
         },
@@ -303,6 +317,10 @@ export default function App() {
     }
   };
 
+  const handleStop = () => {
+    window.api.stopAsk?.();
+  };
+
   const handleNewChat = () => {
     newChat();
     setQuestion("");
@@ -312,7 +330,10 @@ export default function App() {
 
   return (
     <>
-    {showOnboarding && (
+    <div className="web-mode-banner" role="status">
+      📱 Режим просмотра — для полной работы установите десктопное приложение
+    </div>
+    {showOnboarding && !isWebMode() && (
       <Onboarding
         uiLocale={uiLocale}
         onComplete={() => {
@@ -325,7 +346,10 @@ export default function App() {
       <ChatSidebar
         conversations={conversations}
         activeId={activeId}
-        onSelect={selectConversation}
+        onSelect={(id) => {
+          selectConversation(id);
+          setSidebarOpen(false);
+        }}
         onNewChat={handleNewChat}
         onDelete={deleteConversation}
         session={session}
@@ -338,9 +362,34 @@ export default function App() {
         onRefreshPlan={refreshEntitlements}
         loadingSession={loadingSession}
         uiLocale={uiLocale}
+        mobileOpen={sidebarOpen}
+        onMobileClose={() => setSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
+        onCollapseToggle={() => {
+          setSidebarCollapsed((v) => {
+            const next = !v;
+            try { localStorage.setItem("thinknest_sidebar_collapsed", next ? "1" : "0"); } catch {}
+            return next;
+          });
+        }}
       />
       <main className="app-main">
-        <div className="chat-topbar">
+        <div className={`chat-topbar ${sidebarCollapsed ? "chat-topbar--sidebar-collapsed" : ""}`}>
+          <button
+            type="button"
+            className="chat-topbar-menu"
+            onClick={() => {
+              if (sidebarCollapsed) {
+                setSidebarCollapsed(false);
+                try { localStorage.setItem("thinknest_sidebar_collapsed", "0"); } catch {}
+              } else {
+                setSidebarOpen(true);
+              }
+            }}
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Menu"}
+          >
+            ☰
+          </button>
           <div className="chat-topbar-spacer" />
           <LanguageSelector value={uiLocale} onChange={handleLocaleChange} />
         </div>
@@ -357,25 +406,28 @@ export default function App() {
             onChange={setQuestion}
             onSubmit={submit}
             loading={isLoadingInCurrentChat}
+            onStop={handleStop}
             loadingInOtherChat={loading && !isLoadingInCurrentChat}
             disabled={!devMode && !session.token}
             useWebData={useWebData}
             forecastMode={forecastMode}
             deepResearchMode={deepResearchMode}
-            debateMode={debateMode}
             onUseWebDataChange={setUseWebData}
             onForecastModeChange={setForecastMode}
             onDeepResearchModeChange={setDeepResearchMode}
-            onDebateModeChange={setDebateMode}
             statusText={statusText}
             error={error}
             placeholder={inputPlaceholder}
             images={attachedImages}
             onImagesChange={setAttachedImages}
             uiLocale={uiLocale}
-            onOpenMemory={() => setShowMemoryPanel(true)}
+            onOpenMemory={entitlements?.allowMemory !== false ? () => setShowMemoryPanel(true) : undefined}
             expertProfile={expertProfile}
             onExpertProfileChange={setExpertProfile}
+            canUseWebData={entitlements?.allowWebData !== false}
+            canUseForecast={entitlements?.allowForecast !== false}
+            canUseExpertProfile={entitlements?.allowExpertProfile !== false}
+            canUseMemory={entitlements?.allowMemory !== false}
           />
         </div>
       </main>
