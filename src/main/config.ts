@@ -1,3 +1,55 @@
+export type OllamaMode = "fast" | "balanced" | "quality";
+
+/** Модели для каждого режима — пользователь выбирает только режим, модели устанавливаются автоматически */
+export const MODE_MODELS: Record<OllamaMode, {
+  planner: string;
+  critic: string;
+  pragmatist: string;
+  explainer: string;
+  aggregator: string;
+  imageFast: string;
+  deepResearch: string;
+  vision: string;
+}> = {
+  fast: {
+    planner: "phi3",
+    critic: "phi3",
+    pragmatist: "phi3",
+    explainer: "phi3",
+    aggregator: "phi3",
+    imageFast: "phi3",
+    deepResearch: "mistral",
+    vision: "llava"
+  },
+  balanced: {
+    planner: "mistral",
+    critic: "mistral",
+    pragmatist: "mistral",
+    explainer: "phi3",
+    aggregator: "mistral",
+    imageFast: "phi3",
+    deepResearch: "llama3.1",
+    vision: "llava"
+  },
+  quality: {
+    planner: "llama3.1",
+    critic: "llama3.1",
+    pragmatist: "mistral",
+    explainer: "phi3",
+    aggregator: "llama3.1",
+    imageFast: "phi3",
+    deepResearch: "llama3.1",
+    vision: "llava"
+  }
+};
+
+/** Все модели, которые устанавливаются при онбординге — фиксированный набор */
+export const REQUIRED_MODELS = ["phi3", "mistral", "llama3.1", "llava"] as const;
+
+export function getModelsForMode(mode: OllamaMode = "balanced") {
+  return MODE_MODELS[mode] ?? MODE_MODELS.balanced;
+}
+
 export const ollamaConfig = {
   baseUrl: process.env.OLLAMA_BASE_URL ?? "http://localhost:11434/v1",
   /** Таймаут на агента — 60 сек. Быстрые модели не должны зависать. */
