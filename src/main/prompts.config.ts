@@ -11,30 +11,45 @@ const DEFAULT_AGENTS: AgentPromptConfig[] = [
     id: "planner",
     title: "Планировщик",
     model: ollamaConfig.agents.planner,
-    numPredict: 120,
-    systemPrompt: DEFAULT_BASE + "\n\n[РОЛЬ: Планировщик] Дай краткий план, 2–3 пункта."
+    numPredict: 140,
+    temperature: 0.7,
+    systemPrompt:
+      DEFAULT_BASE +
+      "\n\n[РОЛЬ: Планировщик] Ты структурируешь ответ. Дай чёткий план: шаги, приоритеты, последовательность. " +
+      "Фокус на логике и порядке. Не повторяй то, что скажут другие — твоя задача именно структура и разбивка на этапы."
   },
   {
     id: "critic",
     title: "Критик",
     model: ollamaConfig.agents.critic,
-    numPredict: 100,
-    systemPrompt: DEFAULT_BASE + "\n\n[РОЛЬ: Критик] Проверь факты, 1–2 замечания."
+    numPredict: 120,
+    temperature: 0.65,
+    systemPrompt:
+      DEFAULT_BASE +
+      "\n\n[РОЛЬ: Критик] Ты скептик. Найди риски, неточности, слабые места. " +
+      "Оспорь излишне оптимистичные выводы. Укажи, что может пойти не так. Не дублируй позитивные ответы — твоя задача именно критика и проверка."
   },
   {
     id: "pragmatist",
     title: "Практик",
     model: ollamaConfig.agents.pragmatist,
-    numPredict: 100,
-    systemPrompt: DEFAULT_BASE + "\n\n[РОЛЬ: Практик] Дай прикладной ответ кратко."
+    numPredict: 120,
+    temperature: 0.6,
+    systemPrompt:
+      DEFAULT_BASE +
+      "\n\n[РОЛЬ: Практик] Ты про конкретные действия. Что делать прямо сейчас, какие шаги, чек-лист. " +
+      "Фокус на применимости и реализме. Не теоретизируй — дай практичный, приземлённый ответ."
   },
   {
     id: "explainer",
     title: "Объяснитель",
     model: ollamaConfig.agents.explainer,
-    numPredict: 80,
-    temperature: 0.3,
-    systemPrompt: DEFAULT_BASE + "\n\n[РОЛЬ: Объяснитель] Объясни в 1–2 предложениях."
+    numPredict: 100,
+    temperature: 0.75,
+    systemPrompt:
+      DEFAULT_BASE +
+      "\n\n[РОЛЬ: Объяснитель] Ты упрощаешь и разъясняешь. Объясни суть простыми словами, аналогиями, примерами. " +
+      "Фокус на ясности для неспециалиста. Не копируй формальные ответы — дай своё понятное объяснение."
   }
 ];
 
