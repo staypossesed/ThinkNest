@@ -10,17 +10,16 @@ interface MessageInputProps {
   value: string;
   onChange: (v: string) => void;
   onSubmit: () => void;
+  onStop?: () => void;
   loading: boolean;
   loadingInOtherChat?: boolean;
   disabled: boolean;
   useWebData: boolean;
   forecastMode: boolean;
   deepResearchMode: boolean;
-  debateMode: boolean;
   onUseWebDataChange: (v: boolean) => void;
   onForecastModeChange: (v: boolean) => void;
   onDeepResearchModeChange: (v: boolean) => void;
-  onDebateModeChange: (v: boolean) => void;
   statusText: string;
   error: string | null;
   placeholder?: string;
@@ -30,6 +29,11 @@ interface MessageInputProps {
   onOpenMemory?: () => void;
   expertProfile?: string;
   onExpertProfileChange?: (id: string) => void;
+  /** Pro-only feature flags (default true for backward compat) */
+  canUseWebData?: boolean;
+  canUseForecast?: boolean;
+  canUseExpertProfile?: boolean;
+  canUseMemory?: boolean;
 }
 
 function fileToDataUri(file: File, locale: UiLocale): Promise<string> {
@@ -50,17 +54,16 @@ export default function MessageInput(props: MessageInputProps) {
     value,
     onChange,
     onSubmit,
+    onStop,
     loading,
     loadingInOtherChat = false,
     disabled,
     useWebData,
     forecastMode,
     deepResearchMode,
-    debateMode,
     onUseWebDataChange,
     onForecastModeChange,
     onDeepResearchModeChange,
-    onDebateModeChange,
     statusText,
     error,
     placeholder = "",
@@ -69,12 +72,16 @@ export default function MessageInput(props: MessageInputProps) {
     uiLocale,
     onOpenMemory,
     expertProfile = "",
-    onExpertProfileChange
+    onExpertProfileChange,
+    canUseWebData = true,
+    canUseForecast = true,
+    canUseExpertProfile = true,
+    canUseMemory = true
   } = props;
 
   const canSubmit = value.trim() || images.length > 0;
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { start: startSTT, stop: stopSTT, listening } = useSTT();
+  const { start: startSTT, stop: stopSTT, listening, loading: sttLoading, error: sttError } = useSTT();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -109,7 +116,7 @@ export default function MessageInput(props: MessageInputProps) {
 
   const expertLabel = (id: string) => {
     const labels: Record<string, Record<string, string>> = {
-      "": { ru: "🧠", en: "🧠", zh: "🧠" },
+      "": { ru: "👤 Роль", en: "👤 Role", zh: "👤 角色" },
       lawyer: { ru: "⚖️ Юрист", en: "⚖️ Lawyer", zh: "⚖️ 律师" },
       doctor: { ru: "🏥 Врач", en: "🏥 Doctor", zh: "🏥 医生" },
       investor: { ru: "📈 Инвестор", en: "📈 Investor", zh: "📈 投资者" },
@@ -117,7 +124,7 @@ export default function MessageInput(props: MessageInputProps) {
       teacher: { ru: "📚 Учитель", en: "📚 Teacher", zh: "📚 教师" },
       marketer: { ru: "📣 Маркетолог", en: "📣 Marketer", zh: "📣 营销" }
     };
-    return labels[id]?.[uiLocale] ?? labels[id]?.en ?? "🧠";
+    return labels[id]?.[uiLocale] ?? labels[id]?.en ?? "👤 Role";
   };
 
   const nextExpert = () => {
@@ -129,21 +136,27 @@ export default function MessageInput(props: MessageInputProps) {
   return (
     <div className="message-input">
       <div className="message-input-chips">
-        <label className="chip">
+        <label
+          className={`chip ${!canUseWebData ? "chip--locked" : ""}`}
+          title={!canUseWebData ? t(uiLocale, "featureProOnly") : undefined}
+        >
           <input
             type="checkbox"
             checked={useWebData}
             onChange={(e) => onUseWebDataChange(e.target.checked)}
-            disabled={loading}
+            disabled={loading || !canUseWebData}
           />
           <span>{t(uiLocale, "useWebData")}</span>
         </label>
-        <label className="chip">
+        <label
+          className={`chip ${!canUseForecast ? "chip--locked" : ""}`}
+          title={!canUseForecast ? t(uiLocale, "featureProOnly") : undefined}
+        >
           <input
             type="checkbox"
             checked={forecastMode}
             onChange={(e) => onForecastModeChange(e.target.checked)}
-            disabled={loading}
+            disabled={loading || !canUseForecast}
           />
           <span>{t(uiLocale, "forecast")}</span>
         </label>
@@ -155,15 +168,6 @@ export default function MessageInput(props: MessageInputProps) {
             disabled={loading}
           />
           <span>{t(uiLocale, "deepResearch")}</span>
-        </label>
-        <label className="chip" title={uiLocale === "ru" ? "Режим дебатов" : uiLocale === "zh" ? "辩论模式" : "Debate mode"}>
-          <input
-            type="checkbox"
-            checked={debateMode}
-            onChange={(e) => onDebateModeChange(e.target.checked)}
-            disabled={loading}
-          />
-          <span>⚔️ {uiLocale === "ru" ? "Дебаты" : uiLocale === "zh" ? "辩论" : "Debate"}</span>
         </label>
         <input
           ref={fileInputRef}
@@ -184,7 +188,7 @@ export default function MessageInput(props: MessageInputProps) {
           📷 {t(uiLocale, "image")}
         </button>
         {/* Memory button */}
-        {onOpenMemory && (
+        {onOpenMemory && canUseMemory && (
           <button type="button" className="chip" onClick={onOpenMemory} title={uiLocale === "ru" ? "Личная память" : "Memory"}>
             🧠
           </button>
@@ -193,10 +197,10 @@ export default function MessageInput(props: MessageInputProps) {
         {onExpertProfileChange && (
           <button
             type="button"
-            className={`chip ${expertProfile ? "chip--active" : ""}`}
-            onClick={nextExpert}
-            disabled={loading}
-            title={uiLocale === "ru" ? "Эксперт" : uiLocale === "zh" ? "专家" : "Expert"}
+            className={`chip ${expertProfile ? "chip--active" : ""} ${!canUseExpertProfile ? "chip--locked" : ""}`}
+            onClick={canUseExpertProfile ? nextExpert : undefined}
+            disabled={loading || !canUseExpertProfile}
+            title={!canUseExpertProfile ? t(uiLocale, "featureProOnly") : uiLocale === "ru" ? "Эксперт" : uiLocale === "zh" ? "专家" : "Expert"}
           >
             {expertLabel(expertProfile)}
           </button>
@@ -206,10 +210,22 @@ export default function MessageInput(props: MessageInputProps) {
           type="button"
           className={`chip ${listening ? "chip--recording" : ""}`}
           onClick={handleVoice}
-          disabled={loading || disabled}
-          title={uiLocale === "ru" ? "Голосовой ввод" : uiLocale === "zh" ? "语音输入" : "Voice input"}
+          disabled={loading || disabled || sttLoading}
+          title={
+            sttLoading
+              ? uiLocale === "ru"
+                ? "Загрузка модели..."
+                : uiLocale === "zh"
+                  ? "加载模型中..."
+                  : "Loading model..."
+              : uiLocale === "ru"
+                ? "Голосовой ввод"
+                : uiLocale === "zh"
+                  ? "语音输入"
+                  : "Voice input"
+          }
         >
-          {listening ? "🔴" : "🎤"}
+          {sttLoading ? "⏳" : listening ? "🔴" : "🎤"}
         </button>
       </div>
       {images.length > 0 && (
@@ -234,23 +250,47 @@ export default function MessageInput(props: MessageInputProps) {
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              onSubmit();
+              if (!loading) onSubmit();
+            }
+            if (e.key === "Escape" && loading) {
+              onStop?.();
             }
           }}
-          placeholder={listening ? (uiLocale === "ru" ? "Слушаю..." : uiLocale === "zh" ? "正在聆听..." : "Listening...") : placeholder}
+          placeholder={
+            listening
+              ? uiLocale === "ru"
+                ? "Говорите... (нажмите 🎤 для остановки)"
+                : uiLocale === "zh"
+                  ? "说话... (点击 🎤 停止)"
+                  : "Speak... (click 🎤 to stop)"
+              : placeholder
+          }
           rows={1}
           disabled={disabled || loading}
         />
-        <button
-          type="button"
-          onClick={onSubmit}
-          disabled={disabled || loading || !canSubmit}
-          className="message-input-submit"
-        >
-          {loading ? statusText || "..." : t(uiLocale, "submit")}
-        </button>
+        {loading ? (
+          <button
+            type="button"
+            onClick={onStop}
+            className="message-input-stop"
+            title={uiLocale === "ru" ? "Остановить (Esc)" : uiLocale === "zh" ? "停止 (Esc)" : "Stop (Esc)"}
+          >
+            ⏹ {uiLocale === "ru" ? "Стоп" : uiLocale === "zh" ? "停止" : "Stop"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={disabled || !canSubmit}
+            className="message-input-submit"
+          >
+            {t(uiLocale, "submit")}
+          </button>
+        )}
       </div>
-      {error && <div className="message-input-error">{error}</div>}
+      {(error || sttError) && (
+        <div className="message-input-error">{error || sttError}</div>
+      )}
       <p className="message-input-hint">
         {t(uiLocale, "legalHint")}
       </p>
