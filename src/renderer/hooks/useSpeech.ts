@@ -25,49 +25,125 @@ export function useTTS() {
   return { speak, stop, speaking };
 }
 
-/** STT: распознаёт голос через браузерный SpeechRecognition */
+/** STT: MediaRecorder + локальный Whisper (Transformers.js). Web Speech API в Electron не работает. */
 export function useSTT() {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const transcriberRef = useRef<Awaited<ReturnType<typeof import("@huggingface/transformers").pipeline>> | null>(null);
 
-  const start = useCallback((lang = "ru-RU", onResult?: (text: string) => void) => {
-    const SpeechRecognition =
-      window.SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-
-    const rec = new SpeechRecognition();
-    rec.lang = lang;
-    rec.continuous = false;
-    rec.interimResults = true;
-
-    rec.onstart = () => setListening(true);
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-
-    rec.onresult = (event: SpeechRecognitionEvent) => {
-      let interim = "";
-      let final = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const res = event.results[i];
-        if (res.isFinal) final += res[0].transcript;
-        else interim += res[0].transcript;
-      }
-      const text = final || interim;
-      setTranscript(text);
-      if (final && onResult) onResult(final);
-    };
-
-    recognitionRef.current = rec;
-    rec.start();
+  const loadTranscriber = useCallback(async () => {
+    if (transcriberRef.current) return transcriberRef.current;
+    setLoading(true);
+    setError(null);
+    try {
+      const { pipeline } = await import("@huggingface/transformers");
+      transcriberRef.current = await pipeline(
+        "automatic-speech-recognition",
+        "Xenova/whisper-base",
+        { progress_callback: () => {} }
+      );
+      return transcriberRef.current;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      throw e;
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  const start = useCallback(
+    async (lang = "ru-RU", onResult?: (text: string) => void) => {
+      setError(null);
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError("Microphone not supported");
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            sampleRate: 16000,
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+        streamRef.current = stream;
+        chunksRef.current = [];
+
+        const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+          ? "audio/webm;codecs=opus"
+          : "audio/webm";
+        const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 16000 });
+        mediaRecorderRef.current = recorder;
+
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) chunksRef.current.push(e.data);
+        };
+
+        recorder.onstop = async () => {
+          streamRef.current?.getTracks().forEach((t) => t.stop());
+          streamRef.current = null;
+          mediaRecorderRef.current = null;
+          setListening(false);
+
+          const chunks = chunksRef.current;
+          if (chunks.length === 0) return;
+
+          try {
+            const transcriber = await loadTranscriber();
+            const blob = new Blob(chunks, { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            try {
+              const langMap: Record<string, string> = { ru: "russian", en: "english", zh: "chinese" };
+              const langCode = langMap[lang.split("-")[0]] ?? "russian";
+              const result = await transcriber(url, {
+                language: langCode,
+                task: "transcribe",
+                chunk_length_s: 30,
+                stride_length_s: 5
+              });
+              const raw = result as { text?: string; chunks?: Array<{ text: string }> } | string;
+              const text = (typeof raw === "string" ? raw : raw?.text ?? raw?.chunks?.map((c) => c.text).join(" "))?.trim() ?? "";
+              if (text) {
+                setTranscript(text);
+                onResult?.(text);
+              }
+            } finally {
+              URL.revokeObjectURL(url);
+            }
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            setError(msg);
+          }
+        };
+
+        recorder.start();
+        setListening(true);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setError(msg);
+        setListening(false);
+      }
+    },
+    [loadTranscriber]
+  );
 
   const stop = useCallback(() => {
-    recognitionRef.current?.stop();
-    setListening(false);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
   }, []);
 
-  return { start, stop, listening, transcript };
+  return { start, stop, listening, transcript, loading, error };
 }
 
 export function sttLangCode(uiLocale: string): string {
