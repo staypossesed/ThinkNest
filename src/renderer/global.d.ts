@@ -41,6 +41,7 @@ declare global {
       openExternal: (url: string) => Promise<void>;
       isDevMode: () => Promise<boolean>;
       setAskLocale: (locale: string) => Promise<void>;
+      stopAsk: () => Promise<void>;
       checkOllama: () => Promise<OllamaStatus>;
       startOllama: () => Promise<void>;
       saveOnboardingProfile: (profile: string) => Promise<{ ok: boolean }>;

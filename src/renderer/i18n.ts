@@ -51,7 +51,9 @@ export const translations: Record<
     winner: "Победитель",
     reason: "Причина",
     ms: "мс",
-    loadingInOtherChat: "Генерация ответа в другом чате"
+    loadingInOtherChat: "Генерация ответа в другом чате",
+    featureProOnly: "Только Pro — обновите план",
+    upgradeToPro: "Обновить до Pro"
   },
   en: {
     newChat: "New chat",
@@ -100,7 +102,9 @@ export const translations: Record<
     winner: "Winner",
     reason: "Reason",
     ms: "ms",
-    loadingInOtherChat: "Generating response in another chat"
+    loadingInOtherChat: "Generating response in another chat",
+    featureProOnly: "Pro only — upgrade your plan",
+    upgradeToPro: "Upgrade to Pro"
   },
   zh: {
     newChat: "新对话",
@@ -149,7 +153,9 @@ export const translations: Record<
     winner: "获胜者",
     reason: "原因",
     ms: "毫秒",
-    loadingInOtherChat: "正在其他对话中生成回答"
+    loadingInOtherChat: "正在其他对话中生成回答",
+    featureProOnly: "仅 Pro — 升级至 Pro",
+    upgradeToPro: "升级至 Pro"
   }
 };
 
