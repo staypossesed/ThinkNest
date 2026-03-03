@@ -1,8 +1,13 @@
 export type AgentId = "planner" | "critic" | "pragmatist" | "explainer";
 
+/** Режим работы: быстрый / сбалансированный / качественный — влияет на выбор моделей */
+export type OllamaMode = "fast" | "balanced" | "quality";
+
 export interface AskRequest {
   question: string;
   maxAgents?: number;
+  /** Режим: fast | balanced | quality — выбор моделей (из онбординга) */
+  mode?: OllamaMode;
   /** Use web search for fresh data */
   useWebData?: boolean;
   /** Forecast mode: scenarios + confidence */
@@ -70,6 +75,12 @@ export interface Entitlements {
   maxQuestions: number;
   usedQuestions: number;
   remainingQuestions: number;
+  /** Pro-only feature flags (default true for backward compat) */
+  allowWebData?: boolean;
+  allowForecast?: boolean;
+  allowDebate?: boolean;
+  allowExpertProfile?: boolean;
+  allowMemory?: boolean;
 }
 
 export interface CanAskResponse {

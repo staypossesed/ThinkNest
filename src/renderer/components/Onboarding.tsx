@@ -2,6 +2,13 @@ import { useState, useEffect } from "react";
 import type { UiLocale } from "./LanguageSelector";
 import { t } from "../i18n";
 
+const MODE_STORAGE_KEY = "thinknest_mode";
+
+export type OllamaMode = "fast" | "balanced" | "quality";
+
+/** Модели устанавливаются автоматически — фиксированный набор */
+const REQUIRED_MODELS = ["phi3", "mistral", "llama3.1", "llava"] as const;
+
 interface OllamaStatus {
   installed: boolean;
   running: boolean;
@@ -21,36 +28,50 @@ interface OnboardingProps {
   onComplete: () => void;
 }
 
-const PROFILES = [
+const MODES: Array<{
+  id: OllamaMode;
+  emoji: string;
+  label: Record<"ru" | "en" | "zh", string>;
+  desc: Record<"ru" | "en" | "zh", string>;
+}> = [
   {
-    id: "light" as const,
-    emoji: "🐢",
-    label: { ru: "Слабый CPU (4–8 GB RAM)", en: "Light CPU (4–8 GB RAM)", zh: "低配 CPU (4–8 GB)" },
-    desc: { ru: "phi3 — быстрый, лёгкий", en: "phi3 — fast & light", zh: "phi3 — 快速轻量" },
-    models: ["phi3"]
-  },
-  {
-    id: "medium" as const,
+    id: "fast",
     emoji: "⚡",
-    label: { ru: "Средний CPU (8–16 GB)", en: "Medium CPU (8–16 GB)", zh: "中配 CPU (8–16 GB)" },
-    desc: { ru: "mistral + phi3 — баланс", en: "mistral + phi3 — balanced", zh: "mistral + phi3 — 平衡" },
-    models: ["phi3", "mistral"]
+    label: { ru: "Быстрый", en: "Fast", zh: "快速" },
+    desc: {
+      ru: "Максимальная скорость, phi3",
+      en: "Maximum speed, phi3",
+      zh: "最快速度，phi3"
+    }
   },
   {
-    id: "powerful" as const,
-    emoji: "🚀",
-    label: { ru: "Мощный GPU (16+ GB)", en: "Powerful GPU (16+ GB)", zh: "强力 GPU (16+ GB)" },
-    desc: { ru: "mistral + llama3.1 — максимум", en: "mistral + llama3.1 — max quality", zh: "mistral + llama3.1 — 最佳" },
-    models: ["phi3", "mistral", "llama3.1"]
+    id: "balanced",
+    emoji: "⚖️",
+    label: { ru: "Сбалансированный", en: "Balanced", zh: "平衡" },
+    desc: {
+      ru: "Мistral — баланс скорости и качества",
+      en: "Mistral — balance of speed and quality",
+      zh: "Mistral — 速度与质量平衡"
+    }
+  },
+  {
+    id: "quality",
+    emoji: "🎯",
+    label: { ru: "Качественный", en: "Quality", zh: "高质量" },
+    desc: {
+      ru: "Llama 3.1 — лучшее качество ответов",
+      en: "Llama 3.1 — best answer quality",
+      zh: "Llama 3.1 — 最佳回答质量"
+    }
   }
 ];
 
-type Step = "welcome" | "check" | "profile" | "install" | "done";
+type Step = "welcome" | "check" | "mode" | "install" | "done";
 
 export default function Onboarding({ uiLocale, onComplete }: OnboardingProps) {
   const [step, setStep] = useState<Step>("welcome");
   const [status, setStatus] = useState<OllamaStatus | null>(null);
-  const [selectedProfile, setSelectedProfile] = useState<"light" | "medium" | "powerful">("medium");
+  const [selectedMode, setSelectedMode] = useState<OllamaMode>("balanced");
   const [pullProgress, setPullProgress] = useState<Record<string, PullProgress>>({});
   const [installing, setInstalling] = useState(false);
 
@@ -61,18 +82,42 @@ export default function Onboarding({ uiLocale, onComplete }: OnboardingProps) {
       window.api.checkOllama().then((s) => {
         setStatus(s);
         if (s.installed && s.running) {
-          // Already good, skip to profile
-          setStep("profile");
+          setStep("mode");
         }
       });
     }
   }, [step]);
 
+  const saveMode = (mode: OllamaMode) => {
+    try {
+      localStorage.setItem(MODE_STORAGE_KEY, mode);
+    } catch {}
+  };
+
+  const isModelInstalled = (m: string) =>
+    status?.models.some(
+      (installed) => installed.startsWith(m) || m.startsWith(installed.split(":")[0])
+    ) ?? false;
+
   const startInstall = async () => {
     setInstalling(true);
     setStep("install");
-    const profile = PROFILES.find((p) => p.id === selectedProfile)!;
-    for (const model of profile.models) {
+    const modelsToInstall = REQUIRED_MODELS.filter((m) => !isModelInstalled(m));
+    setPullProgress((prev) => {
+      const next = { ...prev };
+      for (const m of REQUIRED_MODELS) {
+        if (isModelInstalled(m))
+          next[m] = { model: m, status: "already installed", percent: 100, done: true };
+      }
+      return next;
+    });
+    if (modelsToInstall.length === 0) {
+      setInstalling(false);
+      setStep("done");
+      saveMode(selectedMode);
+      return;
+    }
+    for (const model of modelsToInstall) {
       try {
         await window.api.pullModel(model, (p: PullProgress) => {
           setPullProgress((prev) => ({ ...prev, [model]: p }));
@@ -83,11 +128,11 @@ export default function Onboarding({ uiLocale, onComplete }: OnboardingProps) {
     }
     setInstalling(false);
     setStep("done");
-    window.api.saveOnboardingProfile(selectedProfile);
+    saveMode(selectedMode);
   };
 
   const skip = () => {
-    window.api.saveOnboardingProfile(selectedProfile);
+    saveMode(selectedMode);
     onComplete();
   };
 
@@ -148,7 +193,7 @@ export default function Onboarding({ uiLocale, onComplete }: OnboardingProps) {
                   await new Promise(r => setTimeout(r, 2000));
                   const s = await window.api.checkOllama();
                   setStatus(s);
-                  if (s.running) setStep("profile");
+                  if (s.running) setStep("mode");
                 }}>
                   {loc === "ru" ? "Запустить Ollama" : loc === "zh" ? "启动 Ollama" : "Start Ollama"}
                 </button>
@@ -157,31 +202,35 @@ export default function Onboarding({ uiLocale, onComplete }: OnboardingProps) {
           </div>
         )}
 
-        {step === "profile" && (
+        {step === "mode" && (
           <div className="onboarding-step">
             <div className="onboarding-logo">⚙️</div>
-            <h2>{loc === "ru" ? "Выберите профиль железа" : loc === "zh" ? "选择硬件配置" : "Select your hardware profile"}</h2>
+            <h2>{loc === "ru" ? "Выберите режим" : loc === "zh" ? "选择模式" : "Choose your mode"}</h2>
             <p className="onboarding-subtitle" style={{ marginBottom: 24 }}>
-              {loc === "ru" ? "Мы подберём оптимальные модели под ваш компьютер." : loc === "zh" ? "我们将为您的电脑选择最优模型。" : "We'll pick optimal models for your hardware."}
+              {loc === "ru"
+                ? "Режим влияет на скорость и качество ответов. Модели установятся автоматически."
+                : loc === "zh"
+                  ? "模式影响回答速度和质量。模型将自动安装。"
+                  : "Mode affects answer speed and quality. Models will be installed automatically."}
             </p>
             <div className="onboarding-profiles">
-              {PROFILES.map((p) => (
+              {MODES.map((m) => (
                 <button
-                  key={p.id}
-                  className={`onboarding-profile-card ${selectedProfile === p.id ? "onboarding-profile-card--active" : ""}`}
-                  onClick={() => setSelectedProfile(p.id)}
+                  key={m.id}
+                  className={`onboarding-profile-card ${selectedMode === m.id ? "onboarding-profile-card--active" : ""}`}
+                  onClick={() => setSelectedMode(m.id)}
                 >
-                  <span className="onboarding-profile-emoji">{p.emoji}</span>
-                  <span className="onboarding-profile-label">{p.label[loc] || p.label.en}</span>
-                  <span className="onboarding-profile-desc">{p.desc[loc] || p.desc.en}</span>
+                  <span className="onboarding-profile-emoji">{m.emoji}</span>
+                  <span className="onboarding-profile-label">{m.label[loc] || m.label.en}</span>
+                  <span className="onboarding-profile-desc">{m.desc[loc] || m.desc.en}</span>
                 </button>
               ))}
             </div>
             <button className="onboarding-btn-primary" onClick={startInstall}>
-              {loc === "ru" ? "Установить модели" : loc === "zh" ? "安装模型" : "Install models"}
+              {loc === "ru" ? "Установить модели и начать" : loc === "zh" ? "安装模型并开始" : "Install models & start"}
             </button>
             <button className="onboarding-btn-link" onClick={skip}>
-              {loc === "ru" ? "Пропустить" : loc === "zh" ? "跳过" : "Skip"}
+              {loc === "ru" ? "Пропустить (модели уже есть)" : loc === "zh" ? "跳过（已有模型）" : "Skip (models already installed)"}
             </button>
           </div>
         )}
@@ -194,7 +243,7 @@ export default function Onboarding({ uiLocale, onComplete }: OnboardingProps) {
               {loc === "ru" ? "Это займёт несколько минут при первой установке." : loc === "zh" ? "首次安装需要几分钟。" : "This may take a few minutes on first install."}
             </p>
             <div className="onboarding-progress-list">
-              {PROFILES.find((p) => p.id === selectedProfile)!.models.map((model) => {
+              {REQUIRED_MODELS.map((model) => {
                 const p = pullProgress[model];
                 return (
                   <div key={model} className="onboarding-progress-item">
