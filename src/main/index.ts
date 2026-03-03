@@ -10,7 +10,7 @@ dotenv.config({ path: backendEnv });
 import { askQuestion } from "./orchestrator";
 import { AskRequest } from "../shared/types";
 import { backendClient, isDevMode } from "./backend";
-import { setAskLocale, clearAskLocale, beginAsk, updateAskLocaleIfActive } from "./askContext";
+import { setAskLocale, clearAskLocale, beginAsk, updateAskLocaleIfActive, stopAsk } from "./askContext";
 import {
   checkOllamaStatus,
   startOllamaServer,
@@ -56,9 +56,21 @@ app.whenReady().then(() => {
     const onToken = (agentId: string, token: string) => {
       event.sender.send("ask:token", { agentId, token });
     };
+    let filteredPayload = payload;
+    if (!isDevMode) {
+      const ent = await backendClient.getEntitlements();
+      filteredPayload = {
+        ...payload,
+        useWebData: payload.useWebData && (ent.allowWebData !== false),
+        forecastMode: payload.forecastMode && (ent.allowForecast !== false),
+        debateMode: true,
+        expertProfile: ent.allowExpertProfile !== false ? payload.expertProfile : undefined,
+        memoryContext: ent.allowMemory !== false ? payload.memoryContext : undefined
+      };
+    }
     try {
       return await askQuestion(
-        payload,
+        filteredPayload,
         onAnswer,
         onToken as (agentId: import("../shared/types").AgentId, token: string) => void
       );
@@ -68,6 +80,10 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("ask:update-locale", (_event, locale: string) => {
     updateAskLocaleIfActive(locale);
+  });
+  ipcMain.handle("ask:stop", () => {
+    stopAsk();
+    return { ok: true };
   });
   ipcMain.handle("auth:get-session", async () => backendClient.getSession());
   ipcMain.handle("isDevMode", () => isDevMode);
