@@ -43,47 +43,59 @@ async function ensureStripeCustomer(user: DbUser): Promise<string> {
 }
 
 export async function registerBillingRoutes(app: FastifyInstance): Promise<void> {
-  app.post("/billing/checkout", { preHandler: [app.authenticate] }, async (request) => {
+  app.post("/billing/checkout", { preHandler: [app.authenticate] }, async (request, reply) => {
     if (!stripeEnabled || !stripe) {
-      return {
-        error:
-          "Billing is not configured yet. Configure Stripe envs to enable Pro payments."
-      };
+      return reply.code(503).send({
+        error: "Billing is not configured yet. Configure Stripe envs to enable Pro payments."
+      });
     }
-    const user = await getUser(request.user!.id);
-    const customerId = await ensureStripeCustomer(user);
-    const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      customer: customerId,
-      line_items: [
-        {
-          price: config.STRIPE_PRICE_PRO_MONTHLY,
-          quantity: 1
+    try {
+      const user = await getUser(request.user!.id);
+      const customerId = await ensureStripeCustomer(user);
+      const session = await stripe.checkout.sessions.create({
+        mode: "subscription",
+        customer: customerId,
+        line_items: [
+          {
+            price: config.STRIPE_PRICE_PRO_MONTHLY!,
+            quantity: 1
+          }
+        ],
+        success_url: config.STRIPE_SUCCESS_URL!,
+        cancel_url: config.STRIPE_CANCEL_URL!,
+        metadata: {
+          userId: user.id
         }
-      ],
-      success_url: config.STRIPE_SUCCESS_URL,
-      cancel_url: config.STRIPE_CANCEL_URL,
-      metadata: {
-        userId: user.id
-      }
-    });
+      });
 
-    return { url: session.url };
+      return { url: session.url };
+    } catch (err) {
+      app.log.error(err);
+      const msg =
+        err instanceof Error ? err.message : "Stripe checkout failed";
+      return reply.code(500).send({ error: msg });
+    }
   });
 
-  app.post("/billing/portal", { preHandler: [app.authenticate] }, async (request) => {
+  app.post("/billing/portal", { preHandler: [app.authenticate] }, async (request, reply) => {
     if (!stripeEnabled || !stripe) {
-      return {
-        error:
-          "Billing is not configured yet. Configure Stripe envs to enable billing portal."
-      };
+      return reply.code(503).send({
+        error: "Billing is not configured yet. Configure Stripe envs to enable billing portal."
+      });
     }
-    const user = await getUser(request.user!.id);
-    const customerId = await ensureStripeCustomer(user);
-    const portal = await stripe.billingPortal.sessions.create({
-      customer: customerId,
-      return_url: config.STRIPE_CANCEL_URL
-    });
-    return { url: portal.url };
+    try {
+      const user = await getUser(request.user!.id);
+      const customerId = await ensureStripeCustomer(user);
+      const portal = await stripe.billingPortal.sessions.create({
+        customer: customerId,
+        return_url: config.STRIPE_CANCEL_URL!
+      });
+      return { url: portal.url };
+    } catch (err) {
+      app.log.error(err);
+      const msg =
+        err instanceof Error ? err.message : "Stripe portal failed";
+      return reply.code(500).send({ error: msg });
+    }
   });
 }

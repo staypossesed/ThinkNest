@@ -58,6 +58,9 @@ export async function registerWebhookRoutes(app: FastifyInstance): Promise<void>
 
           await upsertSubscriptionFromStripe(subscription);
         }
+        if (event.type === "invoice.payment_failed") {
+          app.log.warn({ eventId: event.id }, "Stripe invoice.payment_failed");
+        }
       } catch (error) {
         app.log.error(error);
         return reply.code(500).send({ error: "Webhook processing failed" });
