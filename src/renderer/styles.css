@@ -685,7 +685,8 @@ body {
 
 .message-input-chips {
   display: flex;
-  gap: 16px;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-bottom: 10px;
 }
 
@@ -696,10 +697,43 @@ body {
   cursor: pointer;
   font-size: 0.85rem;
   color: var(--text-secondary);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.message-input .chip:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+}
+
+.message-input .chip--active {
+  color: var(--accent);
+  background: var(--accent-muted);
+}
+
+.message-input .chip--recording {
+  color: var(--error);
+  background: rgba(248, 113, 113, 0.1);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 .message-input .chip input {
   accent-color: var(--accent);
+}
+
+.export-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  justify-content: flex-end;
 }
 
 .message-input-file-hidden {
@@ -1095,6 +1129,369 @@ button:disabled {
   color: var(--success) !important;
   font-weight: 500;
   font-size: 0.85rem;
+}
+
+/* ========== ONBOARDING ========== */
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.onboarding-modal {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 40px;
+  max-width: 520px;
+  width: 92%;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border);
+}
+
+.onboarding-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0;
+}
+
+.onboarding-logo {
+  font-size: 3.5rem;
+  margin-bottom: 16px;
+}
+
+.onboarding-title {
+  margin: 0 0 12px;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.onboarding-subtitle {
+  margin: 0 0 24px;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.onboarding-features {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 28px;
+}
+
+.onboarding-feature {
+  text-align: left;
+  padding: 12px 16px;
+  background: rgba(99, 102, 241, 0.08);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.onboarding-btn-primary {
+  width: 100%;
+  padding: 14px;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 10px;
+  transition: background 0.2s;
+}
+
+.onboarding-btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+.onboarding-btn-link {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  text-decoration: underline;
+}
+
+.onboarding-btn-link:hover {
+  color: var(--text-secondary);
+}
+
+.onboarding-warn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px;
+  background: rgba(248, 113, 113, 0.08);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  width: 100%;
+}
+
+.onboarding-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 20px auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.onboarding-profiles {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.onboarding-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  background: var(--bg-card-hover);
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s, background 0.2s;
+  width: 100%;
+}
+
+.onboarding-profile-card:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.onboarding-profile-card--active {
+  border-color: var(--accent);
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.onboarding-profile-emoji {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+
+.onboarding-profile-label {
+  font-weight: 600;
+  font-size: 0.95rem;
+  flex: 1;
+}
+
+.onboarding-profile-desc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.onboarding-progress-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 16px 0 8px;
+}
+
+.onboarding-progress-item {
+  text-align: left;
+}
+
+.onboarding-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+}
+
+.onboarding-progress-bar {
+  height: 6px;
+  background: var(--bg-card-hover);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.onboarding-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.onboarding-progress-status {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ========== STREAMING cursor ========== */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--text-primary);
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: blink 1s step-end infinite;
+}
+
+/* ========== MEMORY PANEL ========== */
+.memory-panel {
+  padding: 20px;
+}
+
+.memory-panel h3 {
+  margin: 0 0 16px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.memory-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.memory-field label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.memory-field input,
+.memory-field textarea {
+  background: var(--bg-card-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.memory-field input:focus,
+.memory-field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ========== EXPERT PROFILE SELECTOR ========== */
+.expert-selector {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px 0;
+}
+
+.expert-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.expert-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.expert-btn--active {
+  background: var(--accent-muted);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ========== EXPORT BUTTON ========== */
+.export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.export-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ========== DEBATE MODE ========== */
+.debate-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.debate-turn {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.debate-turn--right {
+  flex-direction: row-reverse;
+}
+
+.debate-bubble {
+  max-width: 78%;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card-hover);
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.debate-bubble--planner { border-color: var(--agent-planner); }
+.debate-bubble--critic { border-color: var(--agent-critic); }
+.debate-bubble--pragmatist { border-color: var(--agent-pragmatist); }
+.debate-bubble--explainer { border-color: var(--agent-explainer); }
+
+.debate-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: white;
 }
 
 .pill {

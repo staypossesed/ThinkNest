@@ -22,9 +22,20 @@ function getVerdictPreview(content: string, maxLen = 100): string {
   return first.length <= maxLen ? first : first.slice(0, maxLen) + "…";
 }
 
-export default function AgentCard({ answer, uiLocale }: { answer: AgentAnswer; uiLocale: UiLocale }) {
+interface AgentCardProps {
+  answer: AgentAnswer;
+  uiLocale: UiLocale;
+  /** Текущий стримящийся токен (показывается пока идёт генерация) */
+  streamingContent?: string;
+  isStreaming?: boolean;
+}
+
+export default function AgentCard({ answer, uiLocale, streamingContent, isStreaming }: AgentCardProps) {
   const [expanded, setExpanded] = useState(false);
   const color = agentColors[answer.id] ?? "var(--accent)";
+
+  const displayContent = isStreaming && streamingContent ? streamingContent : answer.content;
+  const preview = getVerdictPreview(displayContent);
 
   return (
     <div className="agent-card" style={{ "--agent-color": color } as React.CSSProperties}>
@@ -32,7 +43,11 @@ export default function AgentCard({ answer, uiLocale }: { answer: AgentAnswer; u
         <div className="agent-card-avatar" style={{ background: color }} />
         <div className="agent-card-meta">
           <span className="agent-card-name">{answer.title}</span>
-          <span className="agent-card-model">{answer.model} • {answer.durationMs} {t(uiLocale, "ms")}</span>
+          <span className="agent-card-model">
+            {answer.model}
+            {!isStreaming && ` • ${answer.durationMs} ${t(uiLocale, "ms")}`}
+            {isStreaming && " • ⏳"}
+          </span>
         </div>
       </div>
       <button
@@ -40,11 +55,13 @@ export default function AgentCard({ answer, uiLocale }: { answer: AgentAnswer; u
         className="agent-card-preview"
         onClick={() => setExpanded(!expanded)}
       >
-        {getVerdictPreview(answer.content)}
+        {preview}
+        {isStreaming && !expanded && <span className="streaming-cursor" />}
       </button>
-      {expanded && (
+      {(expanded || isStreaming) && (
         <div className="agent-card-content">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{answer.content}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayContent}</ReactMarkdown>
+          {isStreaming && <span className="streaming-cursor" />}
         </div>
       )}
     </div>

@@ -14,6 +14,7 @@ interface ChatMainProps {
   maxAgents: number;
   scrollToBottom?: boolean;
   uiLocale: UiLocale;
+  streamingTokens?: Record<string, string>;
 }
 
 export default function ChatMain({
@@ -21,7 +22,8 @@ export default function ChatMain({
   loading,
   maxAgents,
   scrollToBottom = true,
-  uiLocale
+  uiLocale,
+  streamingTokens = {}
 }: ChatMainProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -29,7 +31,7 @@ export default function ChatMain({
     if (scrollToBottom) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, loading, scrollToBottom]);
+  }, [messages, loading, streamingTokens, scrollToBottom]);
 
   if (messages.length === 0 && !loading) {
     return (
@@ -62,17 +64,47 @@ export default function ChatMain({
               <div className="ai-block-agents">
                 {agentOrder.slice(0, maxAgents).map((agentId) => {
                   const answer = msg.answers.find((a) => a.id === agentId);
+                  const isLastMsg = msg === messages[messages.length - 1];
+                  const streamContent = isLastMsg ? streamingTokens[agentId] : undefined;
+                  const isStreaming = isLastMsg && loading && !!streamContent && !answer?.content;
+
                   if (answer) {
-                    return <AgentCard key={agentId} answer={answer} uiLocale={uiLocale} />;
+                    return (
+                      <AgentCard
+                        key={agentId}
+                        answer={answer}
+                        uiLocale={uiLocale}
+                        streamingContent={isLastMsg && loading ? streamContent : undefined}
+                        isStreaming={isStreaming}
+                      />
+                    );
                   }
-                  const isLastAndLoading = msg === messages[messages.length - 1] && loading;
-                  return isLastAndLoading ? (
-                    <SkeletonAgent key={agentId} />
-                  ) : null;
+                  if (isLastMsg && loading) {
+                    if (streamContent) {
+                      // Show streaming card before answer is finalized
+                      return (
+                        <AgentCard
+                          key={agentId}
+                          answer={{ id: agentId, title: agentId, content: streamContent, model: "...", durationMs: 0 }}
+                          uiLocale={uiLocale}
+                          streamingContent={streamContent}
+                          isStreaming
+                        />
+                      );
+                    }
+                    return <SkeletonAgent key={agentId} />;
+                  }
+                  return null;
                 })}
               </div>
               {msg.final ? (
-                <FinalAnswer final={msg.final} webSources={msg.webSources} uiLocale={uiLocale} />
+                <FinalAnswer
+                  final={msg.final}
+                  webSources={msg.webSources}
+                  uiLocale={uiLocale}
+                  question={msg.question}
+                  answers={msg.answers}
+                />
               ) : (
                 msg === messages[messages.length - 1] &&
                 loading &&

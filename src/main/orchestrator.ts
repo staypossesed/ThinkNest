@@ -44,6 +44,15 @@ const freedomInstruction =
   "Пиши грамотно на языке вопроса пользователя. Никаких несуществующих слов, проверяй грамматику. " +
   "Каждая модель ОБЯЗАНА высказать своё мнение. Не копируй стиль других ролей.";
 
+const EXPERT_SYSTEM_PROMPTS: Record<string, string> = {
+  lawyer: "[ЭКСПЕРТ: ЮРИСТ] Отвечай как опытный юрист. Ссылайся на нормы права, указывай риски и ограничения. Не давай конкретных юридических советов — только информацию.",
+  doctor: "[ЭКСПЕРТ: ВРАЧ] Отвечай как квалифицированный врач. Объясняй медицинские понятия доступно. Рекомендуй консультацию специалиста для серьёзных симптомов.",
+  investor: "[ЭКСПЕРТ: ИНВЕСТОР] Отвечай как опытный инвестор. Учитывай риски, ликвидность, горизонт инвестирования. Указывай, что это не финансовая рекомендация.",
+  developer: "[ЭКСПЕРТ: РАЗРАБОТЧИК] Отвечай как senior-разработчик. Приводи примеры кода, best practices, указывай на технический долг и производительность.",
+  teacher: "[ЭКСПЕРТ: УЧИТЕЛЬ] Объясняй как опытный педагог. Используй аналогии, примеры из жизни. Структурируй от простого к сложному.",
+  marketer: "[ЭКСПЕРТ: МАРКЕТОЛОГ] Отвечай как digital-маркетолог. Учитывай ЦА, воронку продаж, метрики и ROI."
+};
+
 function detectQuestionLanguage(input: string): "ru" | "en" {
   const cyr = (input.match(/[А-Яа-яЁё]/g) || []).length;
   const lat = (input.match(/[A-Za-z]/g) || []).length;
@@ -270,7 +279,8 @@ async function checkOllamaAvailable(baseUrl: string): Promise<void> {
 
 export async function askQuestion(
   request: AskRequest,
-  onAgentAnswer?: OnAgentAnswer
+  onAgentAnswer?: OnAgentAnswer,
+  onAgentToken?: (agentId: AgentId, token: string) => void
 ): Promise<AskResponse> {
   const question = request.question.trim();
   if (!question) {
@@ -286,6 +296,9 @@ export async function askQuestion(
   const useWebData = !!request.useWebData;
   const forecastMode = !!request.forecastMode;
   const deepResearchMode = !!request.deepResearchMode;
+  const debateMode = !!request.debateMode;
+  const expertProfile = request.expertProfile ?? "";
+  const memoryContext = (request.memoryContext ?? "").trim();
   const effectiveUseWebData = useWebData || forecastMode || deepResearchMode;
   const lowerQuestion = question.toLowerCase();
   const directAnswerMode =
@@ -368,6 +381,17 @@ export async function askQuestion(
         "новости, соцмедиа/инфлюенсеров, технологические и рыночные события. " +
         "Покажи краткие рассуждения: какие факторы повышают/снижают вероятность каждого сценария."
       : "";
+  const expertInstruction = expertProfile && EXPERT_SYSTEM_PROMPTS[expertProfile]
+    ? `\n\n${EXPERT_SYSTEM_PROMPTS[expertProfile]}`
+    : "";
+  const memoryInstruction = memoryContext
+    ? `\n\n${memoryContext}`
+    : "";
+  const debateInstruction = debateMode
+    ? "\n\n[DEBATE MODE] Это режим дебатов. Выражай СВОЁ уникальное мнение по роли. " +
+      "Прямо указывай где ты согласен или НЕ СОГЛАСЕН с вероятной позицией других агентов. " +
+      "Будь полемичен, приводи контраргументы. Не дублируй чужие точки зрения."
+    : "";
   const forecastFrameworkInstruction = forecastMode
     ? "\n\n[ФОРМАТ ПРОГНОЗА] Дай структуру:\n" +
       "1) Базовый тезис (1-2 предложения)\n" +
@@ -415,6 +439,9 @@ export async function askQuestion(
       freedomInstruction +
       getLanguageInstruction(lang) +
       getCommonSenseInstruction(lang) +
+      memoryInstruction +
+      expertInstruction +
+      debateInstruction +
       deepResearchInstruction +
       forecastFrameworkInstruction +
       imageInstruction +
@@ -466,12 +493,21 @@ export async function askQuestion(
       isLowQualityOcr(ocrText);
     if (needVision) {
       try {
+      // Передаём вопрос пользователя в vision-промпт, чтобы модель знала контекст
+      const lang = getAnswerLang();
+      const userQuestionHint = !imageOnlyQuestion
+        ? (lang === "ru"
+            ? ` Вопрос пользователя к этому изображению: «${question}». Опиши что видишь с учётом вопроса.`
+            : lang === "zh"
+              ? ` 用户问题：「${question}」。结合问题描述图片内容。`
+              : ` User's question about this image: "${question}". Describe what you see in context of the question.`)
+        : "";
       const visionPrompt =
-        getAnswerLang() === "ru"
-          ? "Опиши изображение: объекты, сцену, людей. Текст на картинке уже извлечён отдельно — не дублируй."
-          : getAnswerLang() === "zh"
-            ? "描述图片：物体、场景、人物。文字已单独提取，勿重复。"
-            : "Describe the image: objects, scene, people. Text already extracted separately.";
+        lang === "ru"
+          ? `Подробно проанализируй изображение. Опиши: 1) Все объекты, элементы, цвета, стиль. 2) Что происходит на картинке / назначение объекта. 3) Качество и особенности исполнения.${userQuestionHint}`
+          : lang === "zh"
+            ? `详细分析图片。描述：1) 所有对象、元素、颜色、风格。2) 图片内容/用途。3) 执行质量和特点。${userQuestionHint}`
+            : `Analyze the image in detail. Describe: 1) All objects, elements, colors, style. 2) What is happening / purpose of the object. 3) Quality and execution details.${userQuestionHint}`;
       visionText = await visionChatCompletion({
         baseUrl: ollamaConfig.baseUrl,
         model: ollamaConfig.visionModel,
@@ -509,11 +545,22 @@ export async function askQuestion(
   const isImageOnly = question === "[Изображение]" && imageContext.length > 0;
   const imageOnlyInstruction =
     getAnswerLang() === "ru"
-      ? "Пользователь отправил изображение. Контекст выше. Дай полезный ответ на основе контекста — объекты, текст (если есть), намерение автора, или что пользователь мог хотеть узнать."
+      ? "Пользователь отправил изображение без текстового вопроса. На основе описания выше: " +
+        "определи что это, оцени качество/стиль, предложи улучшения или объясни содержание."
       : getAnswerLang() === "zh"
-        ? "用户发送了图片。上下文如上。根据上下文给出有用回答——物体、文字（如有）、作者意图或用户可能想了解的内容。"
-        : "User sent an image. Context above. Give a useful answer based on the context — objects, text (if any), author intent, or what the user might want to know.";
+        ? "用户发送了图片但没有文字问题。根据上述描述：确定内容，评价质量/风格，提出改进建议或说明内容。"
+        : "User sent an image without a text question. Based on the description above: " +
+          "identify what it is, evaluate quality/style, suggest improvements or explain the content.";
+  const imageWithQuestionPrefix =
+    imageContext && !isImageOnly
+      ? (getAnswerLang() === "ru"
+          ? "[ИЗОБРАЖЕНИЕ ПОЛЬЗОВАТЕЛЯ — ОПИСАНИЕ НИЖЕ]\nОтвечай на вопрос С УЧЁТОМ этого изображения:\n\n"
+          : getAnswerLang() === "zh"
+            ? "[用户图片——描述如下]\n结合图片回答问题：\n\n"
+            : "[USER IMAGE — DESCRIPTION BELOW]\nAnswer the question TAKING INTO ACCOUNT this image:\n\n")
+      : "";
   const userContent =
+    imageWithQuestionPrefix +
     (imageContext || "") +
     (webContext ? `${webContext}\n\n---\n` : "") +
     `${currentContext}\n\n` +
@@ -545,7 +592,8 @@ export async function askQuestion(
         messages: [
           { role: "system", content: buildSystemPrompt(agent, imageContext) },
           { role: "user", content: userContent }
-        ]
+        ],
+        onToken: onAgentToken ? (token) => onAgentToken(agent.id, token) : undefined
       });
       let content = await normalizeAnswerLanguage(rawContent, getAnswerLang(), model);
       const durationMs = Math.round(performance.now() - start);

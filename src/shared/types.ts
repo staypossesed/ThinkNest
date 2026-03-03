@@ -9,10 +9,16 @@ export interface AskRequest {
   forecastMode?: boolean;
   /** Deep research mode: broader evidence and deeper reasoning */
   deepResearchMode?: boolean;
+  /** Debate mode: agents challenge each other */
+  debateMode?: boolean;
   /** Язык ответа: ru | en | zh (ручной выбор или из профиля) */
   preferredLocale?: "ru" | "en" | "zh";
   /** Base64 data URIs (data:image/png;base64,...) для распознавания картинок */
   images?: string[];
+  /** Expert profile: lawyer, doctor, investor, developer, etc. */
+  expertProfile?: string;
+  /** User memory context injected into each agent prompt */
+  memoryContext?: string;
 }
 
 export interface WebSource {
@@ -94,6 +100,8 @@ export interface ConversationMessage {
   useWebData?: boolean;
   forecastMode?: boolean;
   deepResearchMode?: boolean;
+  debateMode?: boolean;
+  expertProfile?: string;
   /** Base64 data URIs для отображения прикреплённых картинок */
   images?: string[];
 }

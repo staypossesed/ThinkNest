@@ -31,6 +31,8 @@ export async function chatCompletion(options: {
   temperature?: number;
   /** Ограничить длину ответа (быстрее для медленных моделей) */
   numPredict?: number;
+  /** Streaming: вызывается для каждого нового кусочка текста */
+  onToken?: (token: string) => void;
 }): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
@@ -38,7 +40,8 @@ export async function chatCompletion(options: {
   const body: Record<string, unknown> = {
     model: options.model,
     messages: options.messages,
-    temperature: options.temperature ?? 0.4
+    temperature: options.temperature ?? 0.4,
+    stream: !!options.onToken
   };
   if (options.numPredict != null) {
     body.options = { num_predict: options.numPredict };
@@ -57,6 +60,41 @@ export async function chatCompletion(options: {
       throw new Error(`Ollama error ${response.status}: ${text}`);
     }
 
+    // Streaming mode: читаем SSE построчно
+    if (options.onToken && response.body) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = "";
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed === "data: [DONE]") continue;
+          const jsonStr = trimmed.startsWith("data: ") ? trimmed.slice(6) : trimmed;
+          try {
+            const chunk = JSON.parse(jsonStr) as {
+              choices?: Array<{ delta?: { content?: string }; finish_reason?: string }>;
+            };
+            const token = chunk.choices?.[0]?.delta?.content ?? "";
+            if (token) {
+              fullContent += token;
+              options.onToken(token);
+            }
+          } catch {
+            // ignore malformed chunk
+          }
+        }
+      }
+      return fullContent.trim();
+    }
+
+    // Non-streaming mode
     const data = (await response.json()) as ChatCompletionResponse;
     const content = data.choices?.[0]?.message?.content ?? "";
     return content.trim();

@@ -10,18 +10,35 @@ import {
 } from "../shared/types";
 
 contextBridge.exposeInMainWorld("api", {
+  checkOllama: () => ipcRenderer.invoke("ollama:check"),
+  startOllama: () => ipcRenderer.invoke("ollama:start"),
+  saveOnboardingProfile: (profile: string) => ipcRenderer.invoke("ollama:save-profile", profile),
+  pullModel: (model: string, onProgress: (p: unknown) => void) => {
+    const handler = (_: unknown, progress: unknown) => onProgress(progress);
+    ipcRenderer.on("ollama:pull-progress", handler);
+    return ipcRenderer
+      .invoke("ollama:pull", model)
+      .finally(() => ipcRenderer.removeListener("ollama:pull-progress", handler));
+  },
   ask: (
     payload: AskRequest,
-    onAnswer?: (answer: AgentAnswer) => void
+    onAnswer?: (answer: AgentAnswer) => void,
+    onToken?: (agentId: string, token: string) => void
   ): Promise<AskResponse> => {
-    if (onAnswer) {
-      const handler = (_: unknown, answer: AgentAnswer) => onAnswer(answer);
-      ipcRenderer.on("ask:answer", handler);
-      return ipcRenderer
-        .invoke("ask", payload)
-        .finally(() => ipcRenderer.removeListener("ask:answer", handler));
-    }
-    return ipcRenderer.invoke("ask", payload);
+    const answerHandler = onAnswer
+      ? (_: unknown, answer: AgentAnswer) => onAnswer(answer)
+      : null;
+    const tokenHandler = onToken
+      ? (_: unknown, data: { agentId: string; token: string }) => onToken(data.agentId, data.token)
+      : null;
+
+    if (answerHandler) ipcRenderer.on("ask:answer", answerHandler);
+    if (tokenHandler) ipcRenderer.on("ask:token", tokenHandler);
+
+    return ipcRenderer.invoke("ask", payload).finally(() => {
+      if (answerHandler) ipcRenderer.removeListener("ask:answer", answerHandler);
+      if (tokenHandler) ipcRenderer.removeListener("ask:token", tokenHandler);
+    });
   },
   getSession: (): Promise<SessionState> => ipcRenderer.invoke("auth:get-session"),
   loginWithGoogle: (): Promise<SessionState> => ipcRenderer.invoke("auth:google-login"),

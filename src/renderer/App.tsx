@@ -11,9 +11,14 @@ import ChatSidebar from "./components/ChatSidebar";
 import ChatMain from "./components/ChatMain";
 import MessageInput from "./components/MessageInput";
 import LanguageSelector, { type UiLocale } from "./components/LanguageSelector";
+import Onboarding from "./components/Onboarding";
+import MemoryPanel from "./components/MemoryPanel";
 import { useConversations } from "./hooks/useConversations";
 import { usePlaceholder } from "./hooks/usePlaceholder";
+import { useMemory } from "./hooks/useMemory";
 import { t } from "./i18n";
+
+const ONBOARDING_DONE_KEY = "thinknest_onboarding_done";
 
 const LANG_STORAGE_KEY = "thinknest_ui_locale";
 
@@ -34,11 +39,18 @@ export default function App() {
   const [useWebData, setUseWebData] = useState(false);
   const [forecastMode, setForecastMode] = useState(false);
   const [deepResearchMode, setDeepResearchMode] = useState(false);
+  const [debateMode, setDebateMode] = useState(false);
+  const [expertProfile, setExpertProfile] = useState("");
+  const [showMemoryPanel, setShowMemoryPanel] = useState(false);
   const [session, setSession] = useState<SessionState>({ token: null, user: null });
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
   const [loadingSession, setLoadingSession] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [devMode, setDevMode] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try { return !localStorage.getItem(ONBOARDING_DONE_KEY); } catch { return false; }
+  });
+  const { memoryContext } = useMemory();
   const [uiLocale, setUiLocale] = useState<UiLocale>(() => {
     try {
       const s = localStorage.getItem(LANG_STORAGE_KEY);
@@ -48,6 +60,7 @@ export default function App() {
   });
 
   const answersRef = useRef<AgentAnswer[]>([]);
+  const [streamingTokens, setStreamingTokens] = useState<Record<string, string>>({});
 
   const {
     conversations,
@@ -214,6 +227,7 @@ export default function App() {
     }
 
     setLoadingConversationIds((prev) => new Set([...prev, conv.id]));
+    setStreamingTokens({});
     answersRef.current = [];
 
     try {
@@ -238,6 +252,9 @@ export default function App() {
           useWebData,
           forecastMode,
           deepResearchMode,
+          debateMode,
+          expertProfile: expertProfile || undefined,
+          memoryContext: memoryContext || undefined,
           preferredLocale,
           images: imagesToSend
         },
@@ -247,9 +264,21 @@ export default function App() {
           answersRef.current.sort(
             (a, b) => agentOrder.indexOf(a.id) - agentOrder.indexOf(b.id)
           );
+          // Clear streaming buffer for this agent when final answer arrives
+          setStreamingTokens((prev) => {
+            const next = { ...prev };
+            delete next[answer.id];
+            return next;
+          });
           updateMessage(conv.id, placeholder.id, {
             answers: [...answersRef.current]
           });
+        },
+        (agentId: string, token: string) => {
+          setStreamingTokens((prev) => ({
+            ...prev,
+            [agentId]: (prev[agentId] ?? "") + token
+          }));
         }
       );
 
@@ -282,6 +311,16 @@ export default function App() {
   };
 
   return (
+    <>
+    {showOnboarding && (
+      <Onboarding
+        uiLocale={uiLocale}
+        onComplete={() => {
+          try { localStorage.setItem(ONBOARDING_DONE_KEY, "1"); } catch {}
+          setShowOnboarding(false);
+        }}
+      />
+    )}
     <div className="app app--chat">
       <ChatSidebar
         conversations={conversations}
@@ -310,6 +349,7 @@ export default function App() {
           loading={isLoadingInCurrentChat}
           maxAgents={maxAgents}
           uiLocale={uiLocale}
+          streamingTokens={isLoadingInCurrentChat ? streamingTokens : {}}
         />
         <div className="app-input-wrap">
           <MessageInput
@@ -322,18 +362,32 @@ export default function App() {
             useWebData={useWebData}
             forecastMode={forecastMode}
             deepResearchMode={deepResearchMode}
+            debateMode={debateMode}
             onUseWebDataChange={setUseWebData}
             onForecastModeChange={setForecastMode}
             onDeepResearchModeChange={setDeepResearchMode}
+            onDebateModeChange={setDebateMode}
             statusText={statusText}
             error={error}
             placeholder={inputPlaceholder}
             images={attachedImages}
             onImagesChange={setAttachedImages}
             uiLocale={uiLocale}
+            onOpenMemory={() => setShowMemoryPanel(true)}
+            expertProfile={expertProfile}
+            onExpertProfileChange={setExpertProfile}
           />
         </div>
       </main>
     </div>
+    {showMemoryPanel && (
+      <MemoryPanel
+        memory={memory}
+        onChange={setMemory}
+        uiLocale={uiLocale}
+        onClose={() => setShowMemoryPanel(false)}
+      />
+    )}
+    </>
   );
 }

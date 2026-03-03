@@ -1,14 +1,17 @@
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { AskResponseSources } from "../../shared/types";
+import type { AgentAnswer, AskResponseSources } from "../../shared/types";
 import type { UiLocale } from "./LanguageSelector";
+import ExportPanel from "./ExportPanel";
 import { t } from "../i18n";
 
 interface FinalAnswerProps {
   final: { content: string; model: string; durationMs: number };
   webSources?: AskResponseSources | null;
   uiLocale: UiLocale;
+  question?: string;
+  answers?: AgentAnswer[];
 }
 
 /** Краткое summary судьи: победитель + причина в 1–2 строки */
@@ -26,7 +29,7 @@ function getJudgeSummary(content: string, maxLen = 140): string {
   return summary.length <= maxLen ? summary : summary.slice(0, maxLen) + "…";
 }
 
-export default function FinalAnswer({ final, webSources, uiLocale }: FinalAnswerProps) {
+export default function FinalAnswer({ final, webSources, uiLocale, question = "", answers = [] }: FinalAnswerProps) {
   const [expanded, setExpanded] = useState(false);
   const summary = getJudgeSummary(final.content);
 
@@ -47,6 +50,9 @@ export default function FinalAnswer({ final, webSources, uiLocale }: FinalAnswer
       <p className="final-answer-meta">
         {final.model} • {final.durationMs} {t(uiLocale, "ms")}
       </p>
+      {answers.length > 0 && (
+        <ExportPanel question={question} answers={answers} final={final} uiLocale={uiLocale} />
+      )}
       {webSources && webSources.results.length > 0 && (
         <div className="final-answer-sources">
           <h4>{t(uiLocale, "sources")}</h4>

@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import type { UiLocale } from "./LanguageSelector";
 import { t } from "../i18n";
+import { useSTT, sttLangCode } from "../hooks/useSpeech";
 
 const MAX_IMAGES = 4;
 const MAX_IMAGE_SIZE_MB = 10;
@@ -10,21 +11,25 @@ interface MessageInputProps {
   onChange: (v: string) => void;
   onSubmit: () => void;
   loading: boolean;
-  /** Показывать подсказку «Генерация в другом чате» */
   loadingInOtherChat?: boolean;
   disabled: boolean;
   useWebData: boolean;
   forecastMode: boolean;
   deepResearchMode: boolean;
+  debateMode: boolean;
   onUseWebDataChange: (v: boolean) => void;
   onForecastModeChange: (v: boolean) => void;
   onDeepResearchModeChange: (v: boolean) => void;
+  onDebateModeChange: (v: boolean) => void;
   statusText: string;
   error: string | null;
   placeholder?: string;
   images?: string[];
   onImagesChange?: (images: string[]) => void;
   uiLocale: UiLocale;
+  onOpenMemory?: () => void;
+  expertProfile?: string;
+  onExpertProfileChange?: (id: string) => void;
 }
 
 function fileToDataUri(file: File, locale: UiLocale): Promise<string> {
@@ -51,19 +56,25 @@ export default function MessageInput(props: MessageInputProps) {
     useWebData,
     forecastMode,
     deepResearchMode,
+    debateMode,
     onUseWebDataChange,
     onForecastModeChange,
     onDeepResearchModeChange,
+    onDebateModeChange,
     statusText,
     error,
     placeholder = "",
     images = [],
     onImagesChange,
-    uiLocale
+    uiLocale,
+    onOpenMemory,
+    expertProfile = "",
+    onExpertProfileChange
   } = props;
 
   const canSubmit = value.trim() || images.length > 0;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { start: startSTT, stop: stopSTT, listening } = useSTT();
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -86,6 +97,33 @@ export default function MessageInput(props: MessageInputProps) {
 
   const removeImage = (idx: number) => {
     onImagesChange?.(images.filter((_, i) => i !== idx));
+  };
+
+  const handleVoice = () => {
+    if (listening) {
+      stopSTT();
+    } else {
+      startSTT(sttLangCode(uiLocale), (text) => onChange(value + (value ? " " : "") + text));
+    }
+  };
+
+  const expertLabel = (id: string) => {
+    const labels: Record<string, Record<string, string>> = {
+      "": { ru: "🧠", en: "🧠", zh: "🧠" },
+      lawyer: { ru: "⚖️ Юрист", en: "⚖️ Lawyer", zh: "⚖️ 律师" },
+      doctor: { ru: "🏥 Врач", en: "🏥 Doctor", zh: "🏥 医生" },
+      investor: { ru: "📈 Инвестор", en: "📈 Investor", zh: "📈 投资者" },
+      developer: { ru: "💻 Dev", en: "💻 Dev", zh: "💻 开发" },
+      teacher: { ru: "📚 Учитель", en: "📚 Teacher", zh: "📚 教师" },
+      marketer: { ru: "📣 Маркетолог", en: "📣 Marketer", zh: "📣 营销" }
+    };
+    return labels[id]?.[uiLocale] ?? labels[id]?.en ?? "🧠";
+  };
+
+  const nextExpert = () => {
+    const order = ["", "lawyer", "doctor", "investor", "developer", "teacher", "marketer"];
+    const cur = order.indexOf(expertProfile);
+    onExpertProfileChange?.(order[(cur + 1) % order.length]);
   };
 
   return (
@@ -118,6 +156,15 @@ export default function MessageInput(props: MessageInputProps) {
           />
           <span>{t(uiLocale, "deepResearch")}</span>
         </label>
+        <label className="chip" title={uiLocale === "ru" ? "Режим дебатов" : uiLocale === "zh" ? "辩论模式" : "Debate mode"}>
+          <input
+            type="checkbox"
+            checked={debateMode}
+            onChange={(e) => onDebateModeChange(e.target.checked)}
+            disabled={loading}
+          />
+          <span>⚔️ {uiLocale === "ru" ? "Дебаты" : uiLocale === "zh" ? "辩论" : "Debate"}</span>
+        </label>
         <input
           ref={fileInputRef}
           type="file"
@@ -135,6 +182,34 @@ export default function MessageInput(props: MessageInputProps) {
           title={t(uiLocale, "attachImage")}
         >
           📷 {t(uiLocale, "image")}
+        </button>
+        {/* Memory button */}
+        {onOpenMemory && (
+          <button type="button" className="chip" onClick={onOpenMemory} title={uiLocale === "ru" ? "Личная память" : "Memory"}>
+            🧠
+          </button>
+        )}
+        {/* Expert profile cycle button */}
+        {onExpertProfileChange && (
+          <button
+            type="button"
+            className={`chip ${expertProfile ? "chip--active" : ""}`}
+            onClick={nextExpert}
+            disabled={loading}
+            title={uiLocale === "ru" ? "Эксперт" : uiLocale === "zh" ? "专家" : "Expert"}
+          >
+            {expertLabel(expertProfile)}
+          </button>
+        )}
+        {/* Voice input button */}
+        <button
+          type="button"
+          className={`chip ${listening ? "chip--recording" : ""}`}
+          onClick={handleVoice}
+          disabled={loading || disabled}
+          title={uiLocale === "ru" ? "Голосовой ввод" : uiLocale === "zh" ? "语音输入" : "Voice input"}
+        >
+          {listening ? "🔴" : "🎤"}
         </button>
       </div>
       {images.length > 0 && (
@@ -162,7 +237,7 @@ export default function MessageInput(props: MessageInputProps) {
               onSubmit();
             }
           }}
-          placeholder={placeholder}
+          placeholder={listening ? (uiLocale === "ru" ? "Слушаю..." : uiLocale === "zh" ? "正在聆听..." : "Listening...") : placeholder}
           rows={1}
           disabled={disabled || loading}
         />

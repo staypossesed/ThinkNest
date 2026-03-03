@@ -11,6 +11,12 @@ import { askQuestion } from "./orchestrator";
 import { AskRequest } from "../shared/types";
 import { backendClient, isDevMode } from "./backend";
 import { setAskLocale, clearAskLocale, beginAsk, updateAskLocaleIfActive } from "./askContext";
+import {
+  checkOllamaStatus,
+  startOllamaServer,
+  pullModel,
+  type HardwareProfile
+} from "./ollamaInstaller";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -47,8 +53,15 @@ app.whenReady().then(() => {
     const onAnswer = (answer: import("../shared/types").AgentAnswer) => {
       event.sender.send("ask:answer", answer);
     };
+    const onToken = (agentId: string, token: string) => {
+      event.sender.send("ask:token", { agentId, token });
+    };
     try {
-      return await askQuestion(payload, onAnswer);
+      return await askQuestion(
+        payload,
+        onAnswer,
+        onToken as (agentId: import("../shared/types").AgentId, token: string) => void
+      );
     } finally {
       clearAskLocale();
     }
@@ -82,6 +95,20 @@ app.whenReady().then(() => {
     if (typeof url === "string" && /^https?:\/\//.test(url)) {
       await shell.openExternal(url);
     }
+  });
+
+  // Ollama installer IPC
+  ipcMain.handle("ollama:check", () => checkOllamaStatus());
+  ipcMain.handle("ollama:start", () => startOllamaServer());
+  ipcMain.handle("ollama:save-profile", (_event, profile: HardwareProfile) => {
+    // profile is stored in renderer localStorage, nothing to do on main side
+    return { ok: true, profile };
+  });
+  ipcMain.handle("ollama:pull", async (event, model: string) => {
+    await pullModel(model, (progress) => {
+      event.sender.send("ollama:pull-progress", progress);
+    });
+    return { ok: true };
   });
 
   createWindow();
