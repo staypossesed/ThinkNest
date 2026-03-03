@@ -26,6 +26,11 @@ export interface Entitlements {
   maxAgents: number;
   periodType: "daily" | "monthly";
   maxQuestions: number;
+  allowWebData: boolean;
+  allowForecast: boolean;
+  allowDebate: boolean;
+  allowExpertProfile: boolean;
+  allowMemory: boolean;
 }
 
 export const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, {
@@ -39,14 +44,24 @@ export const FREE_ENTITLEMENTS: Entitlements = {
   plan: "free",
   maxAgents: 2,
   periodType: "daily",
-  maxQuestions: 20
+  maxQuestions: 15,
+  allowWebData: false,
+  allowForecast: false,
+  allowDebate: false,
+  allowExpertProfile: false,
+  allowMemory: false
 };
 
 export const PRO_ENTITLEMENTS: Entitlements = {
   plan: "pro",
   maxAgents: 4,
   periodType: "monthly",
-  maxQuestions: 500
+  maxQuestions: 500,
+  allowWebData: true,
+  allowForecast: true,
+  allowDebate: true,
+  allowExpertProfile: true,
+  allowMemory: true
 };
 
 export function computePeriodKey(periodType: "daily" | "monthly", now = new Date()): string {

@@ -1,27 +1,31 @@
 import { chatCompletion } from "./ollama";
 import { ollamaConfig } from "./config";
 
-const QUERY_MODEL = "qwen2.5";
-const QUERY_TIMEOUT_MS = 10000;
+/** phi3 — быстрая модель из обязательного набора, всегда установлена */
+const QUERY_MODEL = "phi3";
+const QUERY_TIMEOUT_MS = 5000;
 
 /**
  * Generate 2-3 search queries from any question (universal, no hardcoding).
  * Fallback returns empty array — caller uses question/short/words.
  */
-export async function generateSearchQueries(question: string): Promise<string[]> {
+export async function generateSearchQueries(
+  question: string,
+  signal?: AbortSignal | null
+): Promise<string[]> {
   try {
     const response = await chatCompletion({
       baseUrl: ollamaConfig.baseUrl,
       model: QUERY_MODEL,
       timeoutMs: QUERY_TIMEOUT_MS,
+      externalSignal: signal,
       temperature: 0.2,
+      numPredict: 80,
       messages: [
         {
           role: "system",
           content:
-            "Ты помощник. Из вопроса пользователя выдели 2-3 коротких поисковых запроса для поиска в интернете. " +
-            "Включи ключевые слова: имена, даты, места. Пример: «кто привез картошку в Россию» → «картофель Россия история», «Петр I картофель». " +
-            "Ответь ТОЛЬКО запросами через запятую, без нумерации и пояснений."
+            "Из вопроса выдели 2-3 коротких поисковых запроса. Только запросы через запятую, без пояснений."
         },
         { role: "user", content: question }
       ]

@@ -1,11 +1,6 @@
-import { DbSubscription, FREE_ENTITLEMENTS, PRO_ENTITLEMENTS, supabase } from "../db";
+import { DbSubscription, Entitlements, FREE_ENTITLEMENTS, PRO_ENTITLEMENTS, supabase } from "../db";
 
-export interface UserEntitlement {
-  plan: "free" | "pro";
-  maxAgents: number;
-  periodType: "daily" | "monthly";
-  maxQuestions: number;
-}
+export type UserEntitlement = Entitlements;
 
 export async function resolveEntitlement(userId: string): Promise<UserEntitlement> {
   const { data, error } = await supabase
