@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import logo from "../assets/logo.svg";
 import type { Conversation, SessionState, Entitlements } from "../../shared/types";
@@ -23,6 +23,10 @@ interface ChatSidebarProps {
   onRefreshPlan: () => void;
   loadingSession: boolean;
   uiLocale: UiLocale;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
+  collapsed?: boolean;
+  onCollapseToggle?: () => void;
 }
 
 function formatDate(ts: number, locale: UiLocale): string {
@@ -56,9 +60,20 @@ export default function ChatSidebar({
   onManageBilling,
   onRefreshPlan,
   loadingSession,
-  uiLocale
+  uiLocale,
+  mobileOpen = false,
+  onMobileClose,
+  collapsed = false,
+  onCollapseToggle
 }: ChatSidebarProps) {
   const [deleteModal, setDeleteModal] = useState<{ id: string } | null>(null);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 768);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const fn = () => setIsMobile(mq.matches);
+    mq.addEventListener("change", fn);
+    return () => mq.removeEventListener("change", fn);
+  }, []);
   const [dontAskAgain, setDontAskAgain] = useState(false);
 
   const profileName = session.user
@@ -93,7 +108,28 @@ export default function ChatSidebar({
   };
 
   return (
-    <aside className="chat-sidebar">
+    <>
+      {mobileOpen && (
+        <div
+          className="chat-sidebar-backdrop"
+          onClick={onMobileClose}
+          onKeyDown={(e) => e.key === "Escape" && onMobileClose?.()}
+          role="button"
+          tabIndex={0}
+          aria-label="Close menu"
+        />
+      )}
+    <aside className={`chat-sidebar ${mobileOpen ? "chat-sidebar--mobile-open" : ""} ${collapsed ? "chat-sidebar--collapsed" : ""}`}>
+      {(onMobileClose || onCollapseToggle) && (
+        <button
+          type="button"
+          className="chat-sidebar-close"
+          onClick={() => (isMobile ? onMobileClose?.() : onCollapseToggle?.())}
+          aria-label={isMobile ? (uiLocale === "ru" ? "Закрыть" : "Close") : (uiLocale === "ru" ? "Свернуть меню" : "Collapse sidebar")}
+        >
+          ×
+        </button>
+      )}
       <div className="chat-sidebar-brand">
         <img src={logo} alt="" className="chat-sidebar-logo" />
         <span className="chat-sidebar-title">ThinkNest</span>
@@ -219,5 +255,6 @@ export default function ChatSidebar({
           document.body
         )}
     </aside>
+    </>
   );
 }
