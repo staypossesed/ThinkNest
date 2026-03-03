@@ -33,6 +33,7 @@ export default function App() {
   const [loadingConversationIds, setLoadingConversationIds] = useState<Set<string>>(new Set());
   const [useWebData, setUseWebData] = useState(false);
   const [forecastMode, setForecastMode] = useState(false);
+  const [deepResearchMode, setDeepResearchMode] = useState(false);
   const [session, setSession] = useState<SessionState>({ token: null, user: null });
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
   const [loadingSession, setLoadingSession] = useState(true);
@@ -197,6 +198,7 @@ export default function App() {
       const result = createConversationWithFirstMessage(questionText, {
         useWebData,
         forecastMode,
+        deepResearchMode,
         images: imagesToSend
       });
       conv = result.conv;
@@ -206,6 +208,7 @@ export default function App() {
       placeholder = addMessagePlaceholder(conv.id, questionText, {
         useWebData,
         forecastMode,
+        deepResearchMode,
         images: imagesToSend
       });
     }
@@ -234,6 +237,7 @@ export default function App() {
           maxAgents: canAsk.entitlements.maxAgents,
           useWebData,
           forecastMode,
+          deepResearchMode,
           preferredLocale,
           images: imagesToSend
         },
@@ -317,8 +321,10 @@ export default function App() {
             disabled={!devMode && !session.token}
             useWebData={useWebData}
             forecastMode={forecastMode}
+            deepResearchMode={deepResearchMode}
             onUseWebDataChange={setUseWebData}
             onForecastModeChange={setForecastMode}
+            onDeepResearchModeChange={setDeepResearchMode}
             statusText={statusText}
             error={error}
             placeholder={inputPlaceholder}

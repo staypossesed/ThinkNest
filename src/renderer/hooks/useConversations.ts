@@ -87,7 +87,12 @@ export function useConversations(devMode: boolean) {
   const createConversationWithFirstMessage = useCallback(
     (
       question: string,
-      options?: { useWebData?: boolean; forecastMode?: boolean; images?: string[] }
+      options?: {
+        useWebData?: boolean;
+        forecastMode?: boolean;
+        deepResearchMode?: boolean;
+        images?: string[];
+      }
     ): { conv: Conversation; placeholder: ConversationMessage } => {
       const id = generateId();
       const now = Date.now();
@@ -100,6 +105,7 @@ export function useConversations(devMode: boolean) {
         webSources: null,
         useWebData: options?.useWebData,
         forecastMode: options?.forecastMode,
+        deepResearchMode: options?.deepResearchMode,
         images: options?.images
       };
       const conv: Conversation = {
@@ -119,7 +125,12 @@ export function useConversations(devMode: boolean) {
     (
       convId: string,
       question: string,
-      options?: { useWebData?: boolean; forecastMode?: boolean; images?: string[] }
+      options?: {
+        useWebData?: boolean;
+        forecastMode?: boolean;
+        deepResearchMode?: boolean;
+        images?: string[];
+      }
     ): ConversationMessage => {
       const msg: ConversationMessage = {
         id: generateId(),
@@ -130,6 +141,7 @@ export function useConversations(devMode: boolean) {
         webSources: null,
         useWebData: options?.useWebData,
         forecastMode: options?.forecastMode,
+        deepResearchMode: options?.deepResearchMode,
         images: options?.images
       };
       persistWithLatest((prev) =>

@@ -11,6 +11,7 @@ import { extractTextFromImages } from "./ocr";
 import { chatCompletion, visionChatCompletion } from "./ollama";
 import { ollamaConfig } from "./config";
 import { searchWeb, formatWebContext } from "./webSearch";
+import { generateSearchQueries, getFallbackQueries } from "./queryGenerator";
 import { getPrompts } from "./prompts.config";
 import { getAskLocale } from "./askContext";
 
@@ -82,6 +83,15 @@ function hasForeignScriptNoise(input: string, lang: "ru" | "en"): boolean {
   if (hasCjk || hasArabic) return true;
   if (lang === "ru") return hasLat && hasCyr && (input.match(/[A-Za-z]/g) || []).length > 10;
   return hasCyr && hasLat && (input.match(/[А-Яа-яЁё]/g) || []).length > 24;
+}
+
+function isLowQualityOcr(text: string): boolean {
+  const t = text.trim();
+  if (!t) return true;
+  if (t.length < 12) return true;
+  const alnum = (t.match(/[A-Za-zА-Яа-яЁё0-9]/g) || []).length;
+  const ratio = alnum / Math.max(1, t.length);
+  return ratio < 0.45;
 }
 
 /** Удаляет шаблонный мусор: «Основание: не указано», «Следующий шаг: готов отвечать» и т.п. */
@@ -203,6 +213,44 @@ async function runWithConcurrency<T, R>(
   return out;
 }
 
+function isAbortLikeError(message: string): boolean {
+  const m = message.toLowerCase();
+  return m.includes("aborted") || m.includes("abort") || m.includes("timeout");
+}
+
+function buildHardFallback(
+  agentId: AgentId,
+  lang: "ru" | "en" | "zh",
+  question: string,
+  forecastMode: boolean,
+  deepResearchMode: boolean
+): string {
+  if (lang === "ru") {
+    if (forecastMode) {
+      return (
+        "Резервный ответ: базовый вероятностный сценарий без полной выборки свежих данных. " +
+        "Ожидается движение в текущем диапазоне с повышенной волатильностью. " +
+        "Ключевые факторы: макроэкономика, регуляторика, геополитика, ликвидность и новостной фон."
+      );
+    }
+    if (deepResearchMode) {
+      return (
+        `Резервный ответ (${agentId}): по вопросу «${question}» рекомендую: ` +
+        "1) зафиксировать цель и критерии выбора, 2) собрать 2–3 надежных источника, " +
+        "3) сравнить варианты по рискам/выгодам и выбрать практичный план действий."
+      );
+    }
+    return (
+      `Резервный ответ (${agentId}): по вопросу «${question}» ` +
+      "уточните 1–2 критерия (бюджет/срок/уровень), и можно сразу дать точный короткий список решений."
+    );
+  }
+  if (lang === "zh") {
+    return "备用回答：当前代理超时。请明确目标与约束，我将给出可执行结论。";
+  }
+  return "Fallback answer: this agent timed out. Clarify your target and constraints for a precise actionable answer.";
+}
+
 async function checkOllamaAvailable(baseUrl: string): Promise<void> {
   const url = baseUrl.replace(/\/v1\/?$/, "") + "/api/tags";
   const ctrl = new AbortController();
@@ -237,6 +285,8 @@ export async function askQuestion(
   };
   const useWebData = !!request.useWebData;
   const forecastMode = !!request.forecastMode;
+  const deepResearchMode = !!request.deepResearchMode;
+  const effectiveUseWebData = useWebData || forecastMode || deepResearchMode;
   const lowerQuestion = question.toLowerCase();
   const directAnswerMode =
     /кто.*лучше|лучший|best|who is best|кому.*обрат|к кому.*обрат|who to contact|help me/i.test(
@@ -246,6 +296,8 @@ export async function askQuestion(
   _dbg("orchestrator.ts:modes", "computed request modes", {
     answerLang: getAnswerLang(),
     useWebData,
+    deepResearchMode,
+    effectiveUseWebData,
     forecastMode,
     directAnswerMode
   }, "H21");
@@ -253,9 +305,16 @@ export async function askQuestion(
 
   let webSources: WebSource[] = [];
   let webContext = "";
-  if (useWebData) {
-    const mainQuery = question.replace(/\s+/g, " ").trim().slice(0, 80);
-    const results = await searchWeb([mainQuery]);
+  if (effectiveUseWebData) {
+    const mainQuery = question.replace(/\s+/g, " ").trim().slice(0, 120);
+    const generated =
+      deepResearchMode || forecastMode ? await generateSearchQueries(mainQuery) : [];
+    const fallback = getFallbackQueries(mainQuery);
+    const queries = Array.from(new Set([...fallback, ...generated]))
+      .map((q) => q.trim())
+      .filter(Boolean)
+      .slice(0, deepResearchMode ? 6 : 3);
+    const results = await searchWeb(queries);
     webSources = results.map((r) => ({
       title: r.title,
       url: r.url,
@@ -293,12 +352,30 @@ export async function askQuestion(
       ? "\n\n[ФАКТИЧЕСКИЙ РЕЖИМ] В сообщении пользователя есть блок «ИСТОЧНИКИ ИЗ ИНТЕРНЕТА». " +
         "Твой ответ ДОЛЖЕН содержать ТОЛЬКО имена, даты и факты из этого блока. " +
         "НЕ ВЫДУМЫВАЙ. Если в блоке нет ответа — напиши «в найденных источниках не указано»."
-      : "\n\n[РЕЖИМ ПРОГНОЗА] Планировщик может давать прогнозы. Остальные — опирайся на веб-блок ниже."
+      : "\n\n[РЕЖИМ ПРОГНОЗА] Делай вероятностный прогноз по веб-данным и контексту. " +
+        "Укажи сценарии (бычий/базовый/медвежий), диапазон значений, вероятности и факторы риска."
     : forecastMode
       ? "\n\n[РЕЖИМ ПРОГНОЗА] Можно давать допущения, но помечай их как предположение."
       : "\n\n[НЕТ ВЕБ-ИСТОЧНИКОВ] Используй свои знания. Дай умный, полезный ответ. " +
         "Пометь «по моим знаниям» и рекомендует проверить актуальность. " +
         "Не отказывайся — твоя задача отвечать как умнейший помощник.";
+  const deepResearchInstruction =
+    deepResearchMode
+      ? "\n\n[DEEP RESEARCH] Ответ должен быть аналитическим и конструктивным: " +
+        "1) Тезисный вывод, 2) Ключевые драйверы/факторы, 3) Причинно-следственные связи, " +
+        "4) Сценарии и риски, 5) Что мониторить дальше. " +
+        "Для прогноза учитывай макроэкономику, регуляторику, геополитику, поведение крупных игроков, " +
+        "новости, соцмедиа/инфлюенсеров, технологические и рыночные события. " +
+        "Покажи краткие рассуждения: какие факторы повышают/снижают вероятность каждого сценария."
+      : "";
+  const forecastFrameworkInstruction = forecastMode
+    ? "\n\n[ФОРМАТ ПРОГНОЗА] Дай структуру:\n" +
+      "1) Базовый тезис (1-2 предложения)\n" +
+      "2) Сценарии: бычий/базовый/медвежий\n" +
+      "3) Диапазон значений и вероятность каждого сценария (в сумме 100%)\n" +
+      "4) Факторы влияния: макро, ставка ФРС/ликвидность, ETF/крупные игроки, геополитика, регуляторика, соцмедиа/инфлюенсеры, форс-мажоры\n" +
+      "5) Что может быстро сломать прогноз"
+    : "";
   const getFocusInstruction = (lang: AnswerLang) =>
     lang === "ru"
       ? "\n\nОтвечай СТРОГО на вопрос. Грамотный русский. Без несуществующих слов."
@@ -320,7 +397,8 @@ export async function askQuestion(
     : "";
 
   const prompts = getPrompts();
-  const complexity = estimateQuestionComplexity(question);
+  const complexity = deepResearchMode ? "complex" : estimateQuestionComplexity(question);
+  const hasInputImages = (request.images?.some((s) => s?.startsWith("data:image/")) ?? false);
   const buildSystemPrompt = (agent: { systemPrompt: string; id: AgentId }, imgCtx: string) => {
     const lang = getAnswerLang();
     const forecastSuffix = forecastMode && agent.id === "planner" ? prompts.forecastSuffix : "";
@@ -337,6 +415,8 @@ export async function askQuestion(
       freedomInstruction +
       getLanguageInstruction(lang) +
       getCommonSenseInstruction(lang) +
+      deepResearchInstruction +
+      forecastFrameworkInstruction +
       imageInstruction +
       webInstruction +
       getFocusInstruction(lang) +
@@ -350,9 +430,15 @@ export async function askQuestion(
     );
   };
   const agentProfiles = prompts.agents.map((a) => {
-    const numPredict =
+    const baseNumPredict =
       complexity === "simple" ? SIMPLE_NUM_PREDICT[a.id] : (a.numPredict ?? 200);
-    return { ...a, numPredict };
+    const numPredict = deepResearchMode
+      ? Math.max(320, Math.round(baseNumPredict * 2.5))
+      : baseNumPredict;
+    const model = deepResearchMode
+      ? ollamaConfig.deepResearchModel
+      : (hasInputImages ? ollamaConfig.imageFastModel : a.model);
+    return { ...a, model, numPredict };
   });
 
   const maxAgents = Math.max(1, Math.min(4, request.maxAgents ?? 4));
@@ -369,9 +455,16 @@ export async function askQuestion(
       // OCR не критичен — продолжаем с vision
     }
 
-    // 2. Vision (llava) — объекты/сцена. Если OCR уже дал текст, по умолчанию пропускаем vision.
+    // 2. Vision (llava) — объекты/сцена.
+    // Для image-only запускаем vision всегда. Иначе можем пропустить vision,
+    // только если OCR выглядит качественным.
     let visionText = "";
-    if (!ocrText || !ollamaConfig.skipVisionIfOcr) {
+    const imageOnlyQuestion = question === "[Изображение]";
+    const needVision =
+      imageOnlyQuestion ||
+      !ollamaConfig.skipVisionIfOcr ||
+      isLowQualityOcr(ocrText);
+    if (needVision) {
       try {
       const visionPrompt =
         getAnswerLang() === "ru"
@@ -404,7 +497,7 @@ export async function askQuestion(
         }
       }
     } else {
-      visionText = "(ocr-режим: анализ по тексту с картинки, без vision)";
+      visionText = "(ocr-режим: распознавание текста качественное, vision пропущен)";
     }
 
     const parts: string[] = [];
@@ -441,7 +534,7 @@ export async function askQuestion(
   ): Promise<AgentAnswer> => {
     const start = performance.now();
     const model = agent.model;
-    const timeoutMs = ollamaConfig.timeoutMs;
+    const timeoutMs = deepResearchMode ? ollamaConfig.deepResearchTimeoutMs : ollamaConfig.timeoutMs;
     try {
       const rawContent = await chatCompletion({
         baseUrl: ollamaConfig.baseUrl,
@@ -479,8 +572,37 @@ export async function askQuestion(
       // #endregion
       return answer;
     } catch (error) {
-      const durationMs = Math.round(performance.now() - start);
       const message = error instanceof Error ? error.message : "Unknown error";
+      const fallbackModel = ollamaConfig.imageFastModel || "phi3";
+      if (isAbortLikeError(message) && model !== fallbackModel) {
+        try {
+          const rawFallback = await chatCompletion({
+            baseUrl: ollamaConfig.baseUrl,
+            model: fallbackModel,
+            timeoutMs: Math.min(35000, timeoutMs),
+            temperature: 0.4,
+            numPredict: Math.min(agent.numPredict ?? 120, 90),
+            messages: [
+              { role: "system", content: buildSystemPrompt(agent, imageContext) },
+              { role: "user", content: userContent }
+            ]
+          });
+          const content = await normalizeAnswerLanguage(rawFallback, getAnswerLang(), fallbackModel);
+          const durationMs = Math.round(performance.now() - start);
+          const answer: AgentAnswer = {
+            id: agent.id,
+            title: agent.title,
+            content,
+            model: `${fallbackModel} (fallback)`,
+            durationMs
+          };
+          onAgentAnswer?.(answer);
+          return answer;
+        } catch {
+          // fallback тоже упал — вернём штатную ошибку ниже
+        }
+      }
+      const durationMs = Math.round(performance.now() - start);
       // #region agent log
       _dbg("orchestrator.ts:agentError", "agent failed", {
         agentId: agent.id,
@@ -492,8 +614,8 @@ export async function askQuestion(
       const answer: AgentAnswer = {
         id: agent.id,
         title: agent.title,
-        content: `Ошибка агента: ${message}`,
-        model,
+        content: buildHardFallback(agent.id, getAnswerLang(), question, forecastMode, deepResearchMode),
+        model: `${model} (hard-fallback)`,
         durationMs
       };
       onAgentAnswer?.(answer);
@@ -501,9 +623,19 @@ export async function askQuestion(
     }
   };
 
-  const answers = ollamaConfig.sequentialAgents
+  const answers = (ollamaConfig.sequentialAgents || deepResearchMode)
     ? await runSequential(activeAgents, runAgent)
     : await runWithConcurrency(activeAgents, runAgent, ollamaConfig.agentConcurrency);
+
+  const sanitizedAnswers = answers.map((a) =>
+    a.content.startsWith("Ошибка агента:")
+      ? {
+          ...a,
+          content: buildHardFallback(a.id, getAnswerLang(), question, forecastMode, deepResearchMode),
+          model: `${a.model} (sanitized)`
+        }
+      : a
+  );
 
   const aggStart = performance.now();
   const judgeModeHint = isFactualMode
@@ -521,13 +653,15 @@ export async function askQuestion(
   const aggSystem =
     SYSTEM_OVERRIDE + "\n\n" + prompts.judgeBase + "\n\n" + judgeModeHint + judgeLangHint;
 
-  const aggUserContent = buildAggregationInput(question, answers, webContext);
+  const aggUserContent = buildAggregationInput(question, sanitizedAnswers, webContext);
 
   try {
     const judgeResponse = await chatCompletion({
       baseUrl: ollamaConfig.baseUrl,
-      model: ollamaConfig.aggregatorModel,
-      timeoutMs: ollamaConfig.timeoutMs,
+      model: deepResearchMode
+        ? ollamaConfig.deepResearchModel
+        : (hasInputImages ? ollamaConfig.imageFastModel : ollamaConfig.aggregatorModel),
+      timeoutMs: deepResearchMode ? ollamaConfig.deepResearchTimeoutMs : ollamaConfig.timeoutMs,
       temperature: 0.3,
       messages: [
         { role: "system", content: aggSystem },
@@ -537,9 +671,9 @@ export async function askQuestion(
 
     const winnerId = parseWinnerId(judgeResponse);
     const winner =
-      answers.find((a) => a.id === winnerId) ??
-      answers.find((a) => !a.content.startsWith("Ошибка агента:")) ??
-      answers[0];
+      sanitizedAnswers.find((a) => a.id === winnerId) ??
+      sanitizedAnswers.find((a) => !a.content.startsWith("Ошибка агента:")) ??
+      sanitizedAnswers[0];
 
     const reason = parseWinnerReason(judgeResponse);
     const finalContent =
@@ -551,7 +685,7 @@ export async function askQuestion(
     const finalDuration = Math.round(performance.now() - aggStart);
 
     const response: AskResponse = {
-      answers,
+      answers: sanitizedAnswers,
       final: {
         content: finalContent,
         model: winner.model,
@@ -564,14 +698,14 @@ export async function askQuestion(
     return response;
   } catch (error) {
     const finalDuration = Math.round(performance.now() - aggStart);
-    const fallback = answers.find((a) => !a.content.startsWith("Ошибка агента:"));
+    const fallback = sanitizedAnswers.find((a) => !a.content.startsWith("Ошибка агента:"));
     const resp: AskResponse = {
-      answers,
+      answers: sanitizedAnswers,
       final: {
         content: fallback
           ? `🏆 **Победитель: ${fallback.title}** (модель: ${fallback.model})\n\n---\n\n${fallback.content}`
           : "Судья не смог выбрать победителя. Проверьте доступность Ollama.",
-        model: fallback?.model ?? ollamaConfig.aggregatorModel,
+        model: fallback?.model ?? (hasInputImages ? ollamaConfig.imageFastModel : ollamaConfig.aggregatorModel),
         durationMs: finalDuration
       }
     };

@@ -57,9 +57,13 @@ function getSupplementaryQueries(mainQuery: string): string[] {
 /** Универсальный поиск: Google (SerpAPI/Serper) -> Wikipedia -> DDG. Один поток для любых запросов. */
 export async function searchWeb(queries: string[]): Promise<WebSearchResult[]> {
   if (queries.length === 0) return [];
-  const raw = normalizeQuery((queries[0] || "").trim());
+  const normalizedQueries = queries
+    .map((q) => normalizeQuery((q || "").trim()))
+    .filter(Boolean)
+    .slice(0, 8);
+  const raw = normalizedQueries[0] || "";
   const supplementary = getSupplementaryQueries(raw);
-  const allQueries = [raw, ...supplementary];
+  const allQueries = Array.from(new Set([...normalizedQueries, ...supplementary]));
   // #region agent log
   _dbg("webSearch.ts:searchWeb:entry", "searchWeb called", { queriesCount: allQueries.length, raw, supplementary }, "H1");
   // #endregion
@@ -79,10 +83,17 @@ export async function searchWeb(queries: string[]): Promise<WebSearchResult[]> {
   if (results.length > 0) return results.slice(0, MAX_TOTAL);
 
   // 2) Wikipedia
-  let wikiResults = await searchWikipediaFallback([raw]);
+  let wikiResults: WebSearchResult[] = [];
+  for (const q of normalizedQueries) {
+    const part = await searchWikipediaFallback([q]);
+    wikiResults = dedupe([...wikiResults, ...part]);
+  }
   if (wikiResults.length === 0 && /[\u0400-\u04FF]/.test(raw)) {
     const enQuery = await translateToEnglish(raw);
-    if (enQuery) wikiResults = await searchWikipediaFallback([enQuery]);
+    if (enQuery) {
+      const translated = await searchWikipediaFallback([enQuery]);
+      wikiResults = dedupe([...wikiResults, ...translated]);
+    }
   }
   for (const q of supplementary) {
     const extra = await searchWikipediaFallback([q]);
@@ -91,7 +102,11 @@ export async function searchWeb(queries: string[]): Promise<WebSearchResult[]> {
   if (wikiResults.length > 0) return wikiResults.slice(0, MAX_TOTAL);
 
   // 3) DuckDuckGo
-  let ddgResults = await searchDuckDuckGoInstantFallback([raw], false);
+  let ddgResults: WebSearchResult[] = [];
+  for (const q of normalizedQueries) {
+    const part = await searchDuckDuckGoInstantFallback([q], false);
+    ddgResults = dedupe([...ddgResults, ...part]);
+  }
   for (const q of supplementary) {
     const extra = await searchDuckDuckGoInstantFallback([q], false);
     ddgResults = dedupe([...ddgResults, ...extra]);

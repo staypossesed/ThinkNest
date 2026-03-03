@@ -7,6 +7,8 @@ export interface AskRequest {
   useWebData?: boolean;
   /** Forecast mode: scenarios + confidence */
   forecastMode?: boolean;
+  /** Deep research mode: broader evidence and deeper reasoning */
+  deepResearchMode?: boolean;
   /** Язык ответа: ru | en | zh (ручной выбор или из профиля) */
   preferredLocale?: "ru" | "en" | "zh";
   /** Base64 data URIs (data:image/png;base64,...) для распознавания картинок */
@@ -91,6 +93,7 @@ export interface ConversationMessage {
   webSources?: AskResponseSources | null;
   useWebData?: boolean;
   forecastMode?: boolean;
+  deepResearchMode?: boolean;
   /** Base64 data URIs для отображения прикреплённых картинок */
   images?: string[];
 }

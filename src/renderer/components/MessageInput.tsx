@@ -15,8 +15,10 @@ interface MessageInputProps {
   disabled: boolean;
   useWebData: boolean;
   forecastMode: boolean;
+  deepResearchMode: boolean;
   onUseWebDataChange: (v: boolean) => void;
   onForecastModeChange: (v: boolean) => void;
+  onDeepResearchModeChange: (v: boolean) => void;
   statusText: string;
   error: string | null;
   placeholder?: string;
@@ -48,8 +50,10 @@ export default function MessageInput(props: MessageInputProps) {
     disabled,
     useWebData,
     forecastMode,
+    deepResearchMode,
     onUseWebDataChange,
     onForecastModeChange,
+    onDeepResearchModeChange,
     statusText,
     error,
     placeholder = "",
@@ -104,6 +108,15 @@ export default function MessageInput(props: MessageInputProps) {
             disabled={loading}
           />
           <span>{t(uiLocale, "forecast")}</span>
+        </label>
+        <label className="chip">
+          <input
+            type="checkbox"
+            checked={deepResearchMode}
+            onChange={(e) => onDeepResearchModeChange(e.target.checked)}
+            disabled={loading}
+          />
+          <span>{t(uiLocale, "deepResearch")}</span>
         </label>
         <input
           ref={fileInputRef}
