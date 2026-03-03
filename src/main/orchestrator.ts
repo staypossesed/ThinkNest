@@ -9,11 +9,11 @@ import {
 } from "../shared/types";
 import { extractTextFromImages } from "./ocr";
 import { chatCompletion, visionChatCompletion } from "./ollama";
-import { ollamaConfig } from "./config";
+import { ollamaConfig, getModelsForMode } from "./config";
 import { searchWeb, formatWebContext } from "./webSearch";
 import { generateSearchQueries, getFallbackQueries } from "./queryGenerator";
 import { getPrompts } from "./prompts.config";
-import { getAskLocale } from "./askContext";
+import { getAskLocale, getAskSignal } from "./askContext";
 
 // Debug: no-op для публичного репо (включать только локально при отладке)
 function _dbg(_loc: string, _msg: string, _data: Record<string, unknown>, _hid?: string): void {
@@ -227,37 +227,47 @@ function isAbortLikeError(message: string): boolean {
   return m.includes("aborted") || m.includes("abort") || m.includes("timeout");
 }
 
+const HARD_FALLBACK_BY_ROLE: Record<AgentId, Record<"ru" | "en" | "zh", string>> = {
+  planner: {
+    ru: "Резервный ответ (Планировщик): по вопросу рекомендую структурировать ответ: 1) цель и критерии, 2) основные шаги, 3) приоритеты и последовательность.",
+    en: "Fallback (Planner): structure the answer: 1) goal and criteria, 2) main steps, 3) priorities and sequence.",
+    zh: "备用(规划者)：建议结构化回答：1)目标与标准 2)主要步骤 3)优先级与顺序。"
+  },
+  critic: {
+    ru: "Резервный ответ (Критик): важно проверить факты и источники. Возможные риски: неполные данные, субъективные оценки. Рекомендую перепроверить ключевые утверждения.",
+    en: "Fallback (Critic): verify facts and sources. Risks: incomplete data, subjective estimates. Recheck key claims.",
+    zh: "备用(批评者)：需核实事实与来源。风险：数据不全、主观估计。建议复核关键论断。"
+  },
+  pragmatist: {
+    ru: "Резервный ответ (Практик): конкретные шаги: 1) уточните бюджет и сроки, 2) соберите 2–3 надёжных варианта, 3) сравните по рискам и выгодам, выберите практичный план.",
+    en: "Fallback (Pragmatist): concrete steps: 1) clarify budget and timeline, 2) gather 2–3 reliable options, 3) compare risks/benefits, pick a practical plan.",
+    zh: "备用(实践者)：具体步骤：1)明确预算与时限 2)收集2–3可靠选项 3)比较风险与收益，选择可行方案。"
+  },
+  explainer: {
+    ru: "Резервный ответ (Объяснитель): суть вопроса — получить чёткий ответ. Рекомендую переформулировать запрос с указанием контекста (бюджет, регион, цель), тогда можно дать точный ответ.",
+    en: "Fallback (Explainer): essence — get a clear answer. Rephrase with context (budget, region, goal) for a precise reply.",
+    zh: "备用(解释者)：核心是获得清晰答案。建议补充背景(预算、地区、目标)以便精确回答。"
+  }
+};
+
 function buildHardFallback(
   agentId: AgentId,
   lang: "ru" | "en" | "zh",
-  question: string,
+  _question: string,
   forecastMode: boolean,
   deepResearchMode: boolean
 ): string {
-  if (lang === "ru") {
-    if (forecastMode) {
-      return (
-        "Резервный ответ: базовый вероятностный сценарий без полной выборки свежих данных. " +
-        "Ожидается движение в текущем диапазоне с повышенной волатильностью. " +
-        "Ключевые факторы: макроэкономика, регуляторика, геополитика, ликвидность и новостной фон."
-      );
-    }
-    if (deepResearchMode) {
-      return (
-        `Резервный ответ (${agentId}): по вопросу «${question}» рекомендую: ` +
-        "1) зафиксировать цель и критерии выбора, 2) собрать 2–3 надежных источника, " +
-        "3) сравнить варианты по рискам/выгодам и выбрать практичный план действий."
-      );
-    }
-    return (
-      `Резервный ответ (${agentId}): по вопросу «${question}» ` +
-      "уточните 1–2 критерия (бюджет/срок/уровень), и можно сразу дать точный короткий список решений."
-    );
+  if (forecastMode && agentId === "planner") {
+    return lang === "ru"
+      ? "Резервный прогноз: базовый сценарий. Ожидается движение в текущем диапазоне. Факторы: макро, регуляторика, геополитика, ликвидность."
+      : lang === "zh"
+        ? "备用预测：基本情景。关键因素：宏观、监管、地缘、流动性。"
+        : "Fallback forecast: base scenario. Factors: macro, regulation, geopolitics, liquidity.";
   }
-  if (lang === "zh") {
-    return "备用回答：当前代理超时。请明确目标与约束，我将给出可执行结论。";
+  if (deepResearchMode) {
+    return HARD_FALLBACK_BY_ROLE.pragmatist[lang];
   }
-  return "Fallback answer: this agent timed out. Clarify your target and constraints for a precise actionable answer.";
+  return HARD_FALLBACK_BY_ROLE[agentId][lang];
 }
 
 async function checkOllamaAvailable(baseUrl: string): Promise<void> {
@@ -287,6 +297,8 @@ export async function askQuestion(
     throw new Error("Вопрос пустой.");
   }
   await checkOllamaAvailable(ollamaConfig.baseUrl);
+  const mode = request.mode ?? "balanced";
+  const modeModels = getModelsForMode(mode);
   type AnswerLang = "ru" | "en" | "zh";
   const getAnswerLang = (): AnswerLang => {
     const loc = getAskLocale() ?? request.preferredLocale;
@@ -296,7 +308,7 @@ export async function askQuestion(
   const useWebData = !!request.useWebData;
   const forecastMode = !!request.forecastMode;
   const deepResearchMode = !!request.deepResearchMode;
-  const debateMode = !!request.debateMode;
+  const debateMode = true;
   const expertProfile = request.expertProfile ?? "";
   const memoryContext = (request.memoryContext ?? "").trim();
   const effectiveUseWebData = useWebData || forecastMode || deepResearchMode;
@@ -321,7 +333,9 @@ export async function askQuestion(
   if (effectiveUseWebData) {
     const mainQuery = question.replace(/\s+/g, " ").trim().slice(0, 120);
     const generated =
-      deepResearchMode || forecastMode ? await generateSearchQueries(mainQuery) : [];
+      deepResearchMode || forecastMode
+        ? await generateSearchQueries(mainQuery, getAskSignal())
+        : [];
     const fallback = getFallbackQueries(mainQuery);
     const queries = Array.from(new Set([...fallback, ...generated]))
       .map((q) => q.trim())
@@ -387,11 +401,10 @@ export async function askQuestion(
   const memoryInstruction = memoryContext
     ? `\n\n${memoryContext}`
     : "";
-  const debateInstruction = debateMode
-    ? "\n\n[DEBATE MODE] Это режим дебатов. Выражай СВОЁ уникальное мнение по роли. " +
-      "Прямо указывай где ты согласен или НЕ СОГЛАСЕН с вероятной позицией других агентов. " +
-      "Будь полемичен, приводи контраргументы. Не дублируй чужие точки зрения."
-    : "";
+  const debateInstruction =
+    "\n\n[ДЕБАТЫ] 4 эксперта отвечают параллельно. Выражай СВОЁ уникальное мнение по своей роли. " +
+    "Прямо указывай, где согласен или НЕ СОГЛАСЕН с вероятной позицией других. " +
+    "Будь полемичен, приводи контраргументы. ЗАПРЕЩЕНО дублировать чужие точки зрения — каждый агент даёт свой угол зрения.";
   const forecastFrameworkInstruction = forecastMode
     ? "\n\n[ФОРМАТ ПРОГНОЗА] Дай структуру:\n" +
       "1) Базовый тезис (1-2 предложения)\n" +
@@ -463,8 +476,8 @@ export async function askQuestion(
       ? Math.max(320, Math.round(baseNumPredict * 2.5))
       : baseNumPredict;
     const model = deepResearchMode
-      ? ollamaConfig.deepResearchModel
-      : (hasInputImages ? ollamaConfig.imageFastModel : a.model);
+      ? modeModels.deepResearch
+      : (hasInputImages ? modeModels.imageFast : modeModels[a.id]);
     return { ...a, model, numPredict };
   });
 
@@ -510,7 +523,7 @@ export async function askQuestion(
             : `Analyze the image in detail. Describe: 1) All objects, elements, colors, style. 2) What is happening / purpose of the object. 3) Quality and execution details.${userQuestionHint}`;
       visionText = await visionChatCompletion({
         baseUrl: ollamaConfig.baseUrl,
-        model: ollamaConfig.visionModel,
+        model: modeModels.vision,
         prompt: visionPrompt,
         images,
         timeoutMs: ollamaConfig.visionTimeoutMs
@@ -593,7 +606,8 @@ export async function askQuestion(
           { role: "system", content: buildSystemPrompt(agent, imageContext) },
           { role: "user", content: userContent }
         ],
-        onToken: onAgentToken ? (token) => onAgentToken(agent.id, token) : undefined
+        onToken: onAgentToken ? (token) => onAgentToken(agent.id, token) : undefined,
+        externalSignal: getAskSignal()
       });
       let content = await normalizeAnswerLanguage(rawContent, getAnswerLang(), model);
       const durationMs = Math.round(performance.now() - start);
@@ -621,7 +635,27 @@ export async function askQuestion(
       return answer;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      const fallbackModel = ollamaConfig.imageFastModel || "phi3";
+      const isUserStop = getAskSignal()?.aborted && getAskSignal()?.reason === "user-stop";
+      const fallbackModel = modeModels.imageFast || "phi3";
+
+      // Если пользователь нажал Stop — не делаем повторный запрос, возвращаем частичный ответ
+      if (isUserStop) {
+        const durationMs = Math.round(performance.now() - start);
+        const lang = getAnswerLang();
+        const stoppedMsg = lang === "ru"
+          ? "⏹ Остановлено пользователем."
+          : lang === "zh" ? "⏹ 已被用户停止。" : "⏹ Stopped by user.";
+        const answer: AgentAnswer = {
+          id: agent.id,
+          title: agent.title,
+          content: stoppedMsg,
+          model,
+          durationMs
+        };
+        onAgentAnswer?.(answer);
+        return answer;
+      }
+
       if (isAbortLikeError(message) && model !== fallbackModel) {
         try {
           const rawFallback = await chatCompletion({
@@ -633,7 +667,8 @@ export async function askQuestion(
             messages: [
               { role: "system", content: buildSystemPrompt(agent, imageContext) },
               { role: "user", content: userContent }
-            ]
+            ],
+            externalSignal: getAskSignal()
           });
           const content = await normalizeAnswerLanguage(rawFallback, getAnswerLang(), fallbackModel);
           const durationMs = Math.round(performance.now() - start);
@@ -685,6 +720,27 @@ export async function askQuestion(
       : a
   );
 
+  // Если пользователь нажал Stop — пропускаем judge, возвращаем лучший частичный ответ
+  if (getAskSignal()?.aborted && getAskSignal()?.reason === "user-stop") {
+    const lang = getAnswerLang();
+    const note = lang === "ru"
+      ? "⏹ Генерация остановлена пользователем. Показаны ответы, полученные к моменту остановки."
+      : lang === "zh"
+        ? "⏹ 用户停止了生成。显示停止时已收到的回答。"
+        : "⏹ Generation stopped by user. Showing answers received before stopping.";
+    const bestAnswer = sanitizedAnswers.find(
+      (a) => !a.content.startsWith("⏹") && a.content.length > 20
+    ) ?? sanitizedAnswers[0];
+    return {
+      answers: sanitizedAnswers,
+      final: {
+        content: note + (bestAnswer ? `\n\n---\n\n${bestAnswer.content}` : ""),
+        model: bestAnswer?.model ?? "—",
+        durationMs: 0
+      }
+    };
+  }
+
   const aggStart = performance.now();
   const judgeModeHint = isFactualMode
     ? "КРИТИЧНО: Ниже есть блок ИСТОЧНИКИ. Выбери ответ, который СОВПАДАЕТ с источниками. " +
@@ -707,8 +763,8 @@ export async function askQuestion(
     const judgeResponse = await chatCompletion({
       baseUrl: ollamaConfig.baseUrl,
       model: deepResearchMode
-        ? ollamaConfig.deepResearchModel
-        : (hasInputImages ? ollamaConfig.imageFastModel : ollamaConfig.aggregatorModel),
+        ? modeModels.deepResearch
+        : (hasInputImages ? modeModels.imageFast : modeModels.aggregator),
       timeoutMs: deepResearchMode ? ollamaConfig.deepResearchTimeoutMs : ollamaConfig.timeoutMs,
       temperature: 0.3,
       messages: [
@@ -753,7 +809,7 @@ export async function askQuestion(
         content: fallback
           ? `🏆 **Победитель: ${fallback.title}** (модель: ${fallback.model})\n\n---\n\n${fallback.content}`
           : "Судья не смог выбрать победителя. Проверьте доступность Ollama.",
-        model: fallback?.model ?? (hasInputImages ? ollamaConfig.imageFastModel : ollamaConfig.aggregatorModel),
+        model: fallback?.model ?? (hasInputImages ? modeModels.imageFast : modeModels.aggregator),
         durationMs: finalDuration
       }
     };
