@@ -33,9 +33,24 @@ export async function chatCompletion(options: {
   numPredict?: number;
   /** Streaming: вызывается для каждого нового кусочка текста */
   onToken?: (token: string) => void;
+  /** Внешний сигнал остановки (от пользователя) */
+  externalSignal?: AbortSignal | null;
 }): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
+
+  // Слушаем внешний сигнал (кнопка Stop)
+  const externalListener = options.externalSignal
+    ? () => controller.abort(options.externalSignal!.reason)
+    : null;
+  if (externalListener && options.externalSignal) {
+    if (options.externalSignal.aborted) {
+      clearTimeout(timeout);
+      controller.abort(options.externalSignal.reason);
+    } else {
+      options.externalSignal.addEventListener("abort", externalListener, { once: true });
+    }
+  }
 
   const body: Record<string, unknown> = {
     model: options.model,
@@ -100,6 +115,9 @@ export async function chatCompletion(options: {
     return content.trim();
   } finally {
     clearTimeout(timeout);
+    if (externalListener && options.externalSignal) {
+      options.externalSignal.removeEventListener("abort", externalListener);
+    }
   }
 }
 

@@ -53,5 +53,6 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("openExternal", url),
   isDevMode: (): Promise<boolean> => ipcRenderer.invoke("isDevMode"),
   setAskLocale: (locale: string): Promise<void> =>
-    ipcRenderer.invoke("ask:update-locale", locale)
+    ipcRenderer.invoke("ask:update-locale", locale),
+  stopAsk: (): Promise<void> => ipcRenderer.invoke("ask:stop")
 });

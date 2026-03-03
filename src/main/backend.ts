@@ -29,7 +29,12 @@ const DEV_ENTITLEMENTS: Entitlements = {
   periodType: "monthly",
   maxQuestions: 9999,
   usedQuestions: 0,
-  remainingQuestions: 9999
+  remainingQuestions: 9999,
+  allowWebData: true,
+  allowForecast: true,
+  allowDebate: true,
+  allowExpertProfile: true,
+  allowMemory: true
 };
 
 class BackendClient {
