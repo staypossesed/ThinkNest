@@ -15,6 +15,7 @@
   "type": "commonjs",
   "dependencies": {
     "@fastify/cors": "^11.2.0",
+    "tesseract.js": "^7.0.0",
     "@supabase/supabase-js": "^2.98.0",
     "dotenv": "^17.3.1",
     "fastify": "^5.7.4",
