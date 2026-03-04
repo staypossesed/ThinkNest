@@ -27,6 +27,12 @@ interface ChatSidebarProps {
   onMobileClose?: () => void;
   collapsed?: boolean;
   onCollapseToggle?: () => void;
+  subscription?: {
+    active: boolean;
+    interval: string | null;
+    currentPeriodEnd: string | null;
+    cancelAtPeriodEnd: boolean;
+  } | null;
 }
 
 function formatDate(ts: number, locale: UiLocale): string {
@@ -64,7 +70,8 @@ export default function ChatSidebar({
   mobileOpen = false,
   onMobileClose,
   collapsed = false,
-  onCollapseToggle
+  onCollapseToggle,
+  subscription = null
 }: ChatSidebarProps) {
   const [deleteModal, setDeleteModal] = useState<{ id: string } | null>(null);
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 768);
@@ -182,6 +189,25 @@ export default function ChatSidebar({
             {entitlements && (
               <p className="chat-sidebar-meta">
                 {entitlements.usedQuestions}/{entitlements.maxQuestions}
+              </p>
+            )}
+            {subscription?.active && subscription.currentPeriodEnd && (
+              <p className="chat-sidebar-meta chat-sidebar-billing">
+                {subscription.cancelAtPeriodEnd
+                  ? (uiLocale === "ru"
+                      ? "Отмена после периода"
+                      : uiLocale === "zh"
+                        ? "期后取消"
+                        : "Cancels after period")
+                  : (uiLocale === "ru"
+                      ? "Автосписание: "
+                      : uiLocale === "zh"
+                        ? "自动续费："
+                        : "Next billing: ") +
+                    new Date(subscription.currentPeriodEnd).toLocaleDateString(
+                      uiLocale === "ru" ? "ru-RU" : uiLocale === "zh" ? "zh-CN" : "en-US",
+                      { day: "numeric", month: "short", year: "numeric" }
+                    )}
               </p>
             )}
             <div className="chat-sidebar-actions">
