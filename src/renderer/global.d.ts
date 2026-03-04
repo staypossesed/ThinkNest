@@ -36,7 +36,14 @@ declare global {
       getEntitlements: () => Promise<Entitlements>;
       canAsk: () => Promise<CanAskResponse>;
       consumeUsage: (question: string) => Promise<ConsumeUsageResponse>;
-      openCheckout: () => Promise<{ ok: true }>;
+      openCheckout: (plan?: "weekly" | "monthly" | "yearly") => Promise<{ ok: true }>;
+      getSubscription: () => Promise<{
+        active: boolean;
+        plan: string | null;
+        interval: string | null;
+        currentPeriodEnd: string | null;
+        cancelAtPeriodEnd: boolean;
+      }>;
       openPortal: () => Promise<{ ok: true }>;
       openExternal: (url: string) => Promise<void>;
       isDevMode: () => Promise<boolean>;

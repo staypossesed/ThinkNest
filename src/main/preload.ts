@@ -47,7 +47,9 @@ contextBridge.exposeInMainWorld("api", {
   canAsk: (): Promise<CanAskResponse> => ipcRenderer.invoke("usage:can-ask"),
   consumeUsage: (question: string): Promise<ConsumeUsageResponse> =>
     ipcRenderer.invoke("usage:consume", question),
-  openCheckout: (): Promise<{ ok: true }> => ipcRenderer.invoke("billing:checkout"),
+  openCheckout: (plan?: "weekly" | "monthly" | "yearly") =>
+    ipcRenderer.invoke("billing:checkout", plan ?? "monthly"),
+  getSubscription: () => ipcRenderer.invoke("billing:subscription"),
   openPortal: (): Promise<{ ok: true }> => ipcRenderer.invoke("billing:portal"),
   openExternal: (url: string): Promise<void> =>
     ipcRenderer.invoke("openExternal", url),
