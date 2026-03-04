@@ -4,7 +4,7 @@ export interface ChatMessage {
 }
 
 /** Извлекает base URL без /v1 для нативного Ollama API */
-function getOllamaBase(baseUrl: string): string {
+export function getOllamaBase(baseUrl: string): string {
   return baseUrl.replace(/\/v1\/?$/, "") || "http://localhost:11434";
 }
 
@@ -15,12 +15,76 @@ function dataUriToBase64(dataUri: string): string {
   return raw.replace(/\s/g, "");
 }
 
-interface ChatCompletionResponse {
-  choices: Array<{
-    message: {
-      content: string;
-    };
-  }>;
+/** Нативный Ollama /api/chat — быстрее и надёжнее чем /v1/chat/completions */
+async function nativeChat(
+  ollamaBase: string,
+  opts: {
+    model: string;
+    messages: ChatMessage[];
+    temperature?: number;
+    numPredict?: number;
+    stream?: boolean;
+    onToken?: (token: string) => void;
+    signal: AbortSignal;
+  }
+): Promise<string> {
+  const body: Record<string, unknown> = {
+    model: opts.model,
+    messages: opts.messages,
+    stream: opts.stream ?? false,
+    options: {
+      temperature: opts.temperature ?? 0.4,
+      ...(opts.numPredict != null && { num_predict: opts.numPredict })
+    }
+  };
+
+  const response = await fetch(`${ollamaBase}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: opts.signal
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Ollama error ${response.status}: ${text}`);
+  }
+
+  if (opts.stream && response.body) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = "";
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const chunk = JSON.parse(trimmed) as {
+            message?: { content?: string };
+            response?: string;
+          };
+          const token = chunk.message?.content ?? chunk.response ?? "";
+          if (token) {
+            fullContent += token;
+            opts.onToken?.(token);
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    return fullContent.trim();
+  }
+
+  const data = (await response.json()) as { message?: { content?: string } };
+  return (data.message?.content ?? "").trim();
 }
 
 export async function chatCompletion(options: {
@@ -29,17 +93,14 @@ export async function chatCompletion(options: {
   messages: ChatMessage[];
   timeoutMs: number;
   temperature?: number;
-  /** Ограничить длину ответа (быстрее для медленных моделей) */
   numPredict?: number;
-  /** Streaming: вызывается для каждого нового кусочка текста */
   onToken?: (token: string) => void;
-  /** Внешний сигнал остановки (от пользователя) */
   externalSignal?: AbortSignal | null;
 }): Promise<string> {
+  const ollamaBase = getOllamaBase(options.baseUrl);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
 
-  // Слушаем внешний сигнал (кнопка Stop)
   const externalListener = options.externalSignal
     ? () => controller.abort(options.externalSignal!.reason)
     : null;
@@ -52,72 +113,46 @@ export async function chatCompletion(options: {
     }
   }
 
-  const body: Record<string, unknown> = {
-    model: options.model,
-    messages: options.messages,
-    temperature: options.temperature ?? 0.4,
-    stream: !!options.onToken
-  };
-  if (options.numPredict != null) {
-    body.options = { num_predict: options.numPredict };
-  }
-
   try {
-    const response = await fetch(`${options.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+    return await nativeChat(ollamaBase, {
+      model: options.model,
+      messages: options.messages,
+      temperature: options.temperature,
+      numPredict: options.numPredict,
+      stream: !!options.onToken,
+      onToken: options.onToken,
       signal: controller.signal
     });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Ollama error ${response.status}: ${text}`);
-    }
-
-    // Streaming mode: читаем SSE построчно
-    if (options.onToken && response.body) {
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let fullContent = "";
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed === "data: [DONE]") continue;
-          const jsonStr = trimmed.startsWith("data: ") ? trimmed.slice(6) : trimmed;
-          try {
-            const chunk = JSON.parse(jsonStr) as {
-              choices?: Array<{ delta?: { content?: string }; finish_reason?: string }>;
-            };
-            const token = chunk.choices?.[0]?.delta?.content ?? "";
-            if (token) {
-              fullContent += token;
-              options.onToken(token);
-            }
-          } catch {
-            // ignore malformed chunk
-          }
-        }
-      }
-      return fullContent.trim();
-    }
-
-    // Non-streaming mode
-    const data = (await response.json()) as ChatCompletionResponse;
-    const content = data.choices?.[0]?.message?.content ?? "";
-    return content.trim();
   } finally {
     clearTimeout(timeout);
     if (externalListener && options.externalSignal) {
       options.externalSignal.removeEventListener("abort", externalListener);
     }
+  }
+}
+
+/** Предзагрузка модели — держит её в памяти, первый запрос будет быстрее */
+export async function preloadModel(baseUrl: string, model: string, timeoutMs = 15000): Promise<void> {
+  const ollamaBase = getOllamaBase(baseUrl);
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    await fetch(`${ollamaBase}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: "hi" }],
+        stream: false,
+        options: { num_predict: 2 },
+        keep_alive: "5m"
+      }),
+      signal: controller.signal
+    });
+  } catch {
+    /* preload не критичен */
+  } finally {
+    clearTimeout(t);
   }
 }
 
