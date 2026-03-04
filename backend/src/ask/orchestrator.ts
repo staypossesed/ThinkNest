@@ -354,19 +354,34 @@ function buildHardFallback(
 
 async function checkOllamaAvailable(baseUrl: string): Promise<void> {
   const url = baseUrl.replace(/\/v1\/?$/, "") + "/api/tags";
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 3000);
-  try {
-    const res = await fetch(url, { signal: ctrl.signal });
-    clearTimeout(t);
-    if (!res.ok) throw new Error(`Ollama ${res.status}`);
-  } catch (e) {
-    clearTimeout(t);
-    const msg = e instanceof Error ? e.message : "unknown";
-    throw new Error(
-      `Ollama не отвечает (${msg}). Запустите Ollama и проверьте: ollama list`
-    );
+  const timeoutMs = 6000;
+  const maxRetries = 3;
+  let lastError: Error | null = null;
+
+  for (let i = 0; i < maxRetries; i++) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(t);
+      if (res.ok) return;
+      lastError = new Error(`Ollama ${res.status}`);
+    } catch (e) {
+      clearTimeout(t);
+      lastError = e instanceof Error ? e : new Error(String(e));
+    }
+    if (i < maxRetries - 1) {
+      await new Promise((r) => setTimeout(r, 2000));
+    }
   }
+
+  const msg = lastError?.message ?? "unknown";
+  const hint = /abort|timeout/i.test(msg)
+    ? " Ollama может запускаться — подождите 10 сек и попробуйте снова."
+    : "";
+  throw new Error(
+    `Ollama не отвечает (${msg}). Запустите Ollama и проверьте: ollama list.${hint}`
+  );
 }
 
 export async function askQuestion(

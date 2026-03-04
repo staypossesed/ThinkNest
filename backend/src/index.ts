@@ -9,6 +9,7 @@ import { registerWebhookRoutes } from "./webhooks/routes";
 import { registerEntitlementRoutes } from "./entitlements/routes";
 import { registerPortalRoutes } from "./portal/routes";
 import { registerAskRoutes } from "./ask/routes";
+import { ensureOllamaStarted } from "./ollamaStarter";
 
 const app = Fastify({
   logger: true
@@ -51,6 +52,7 @@ app.get("/health", async () => {
 });
 
 async function bootstrap(): Promise<void> {
+  ensureOllamaStarted().catch(() => {});
   await registerAuthRoutes(app);
   await registerBillingRoutes(app);
   await registerWebhookRoutes(app);

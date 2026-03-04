@@ -47,6 +47,14 @@ app.whenReady().then(() => {
     // Ignore session init failures and continue with fresh session.
   });
 
+  if (isDevMode) {
+    checkOllamaStatus().then(({ installed, running }) => {
+      if (installed && !running) {
+        startOllamaServer();
+      }
+    });
+  }
+
   ipcMain.handle("ask", async (event, payload: AskRequest) => {
     setAskLocale(payload.preferredLocale ?? "ru");
     beginAsk();
