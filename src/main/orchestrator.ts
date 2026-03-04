@@ -8,7 +8,7 @@ import {
   WebSource
 } from "../shared/types";
 import { extractTextFromImages } from "./ocr";
-import { chatCompletion, visionChatCompletion } from "./ollama";
+import { chatCompletion, visionChatCompletion, preloadModel } from "./ollama";
 import { ollamaConfig, getModelsForMode } from "./config";
 import { searchWeb, formatWebContext } from "./webSearch";
 import { generateSearchQueries, getFallbackQueries } from "./queryGenerator";
@@ -171,7 +171,7 @@ function estimateQuestionComplexity(question: string): "simple" | "normal" | "co
   const len = q.length;
 
   const simplePatterns =
-    /как тебя зовут|как тебя называ|как дела|привет|приветствую|hello|hi|what is your name|who are you|что ты умеешь|what can you do|как тебя|твоё имя|твое имя/i;
+    /как тебя зовут|как тебя называ|как дела|привет|приветствую|hello|hi|what is your name|what'?s your name|who are you|что ты умеешь|what can you do|как тебя|твоё имя|твое имя|what'?s\s*\d|сколько будет|how much is|\d\s*[\+\-\*\/]\s*\d/i;
   const complexKeywords =
     /юридическ|закон|договор|инвестицион|акци[йи]|курс|биткоин|крипто|прогноз|план|стратеги|рецепт|инструкци|формул|рассчитай|составь план|как создать|как сделать|пошагов|step by step|сравни|анализ|исследован/i;
 
@@ -250,13 +250,100 @@ const HARD_FALLBACK_BY_ROLE: Record<AgentId, Record<"ru" | "en" | "zh", string>>
   }
 };
 
+function getTrivialDirectAnswer(question: string, lang: "ru" | "en" | "zh"): string | null {
+  const q = question.trim().toLowerCase();
+  if (/what'?s?\s*(ur|your)\s*name|как тебя зовут|тво[её] имя|who are you/i.test(q)) {
+    return lang === "ru"
+      ? "Меня зовут ThinkNest — я ваш ИИ-помощник. Чем могу помочь?"
+      : lang === "zh"
+        ? "我是 ThinkNest，您的 AI 助手。有什么可以帮您的？"
+        : "I'm ThinkNest, your AI assistant. How can I help you?";
+  }
+  if (/чем занимаешься|что ты умеешь|what do you do|what can you do|что делаешь/i.test(q)) {
+    return lang === "ru"
+      ? "Я помогаю отвечать на вопросы — от простых фактов до сложного анализа. Спросите что угодно."
+      : lang === "zh"
+        ? "我帮助回答问题，从简单事实到复杂分析。有什么想问的？"
+        : "I help answer questions — from simple facts to complex analysis. Ask me anything.";
+  }
+  const isGreeting =
+    /^(hi|hello|hey|привет|хай|здравствуй|салам|салам алейкум)\s*!?$/i.test(q) ||
+    /^(how are you|how do you do|как дела|как ты)\s*!?$/i.test(q) ||
+    /привет[,!]?\s*(как|чем|что)/i.test(q) ||
+    /салам[,!]?\s*(как|чем|что|родной|брат|друг)/i.test(q) ||
+    /(как ты|как дела)[,!]?\s*(родной|брат|друг|братан)?/i.test(q) ||
+    (q.length < 50 && /^(привет|салам|хай|hello|hi)\s+.+(родной|брат|друг|dear|buddy)/i.test(q));
+  if (isGreeting) {
+    return lang === "ru"
+      ? "Привет! Всё отлично, спасибо. Чем могу помочь?"
+      : lang === "zh"
+        ? "你好！有什么可以帮您的？"
+        : "Hello! All good, thanks. How can I help you?";
+  }
+  if (/^\d+\s*[\+\-\*\/]\s*\d+\s*$|what'?s?\s*\d+\s*[\+\-\*\/]\s*\d|сколько будет\s*\d/i.test(q)) {
+    try {
+      const expr = q.replace(/[^\d\+\-\*\/\.\s]/g, "").replace(/\s/g, "");
+      if (expr && /^\d+[\+\-\*\/]\d+$/.test(expr)) {
+        const n = Function(`"use strict"; return (${expr})`)();
+        return String(Number.isFinite(n) ? n : "?");
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
+}
+
+const MINIMAL_RETRY_TIMEOUT_MS = 22000;
+
+async function tryMinimalResponse(
+  baseUrl: string,
+  question: string,
+  lang: "ru" | "en" | "zh"
+): Promise<string | null> {
+  const sys =
+    lang === "ru"
+      ? "Ответь кратко, 1–2 предложения. Используй тот же язык, что и вопрос."
+      : lang === "zh"
+        ? "简短回答，1-2句话。使用与问题相同的语言。"
+        : "Answer briefly in 1–2 sentences. Use the same language as the question.";
+  try {
+    const raw = await chatCompletion({
+      baseUrl,
+      model: "phi3",
+      timeoutMs: MINIMAL_RETRY_TIMEOUT_MS,
+      temperature: 0.5,
+      numPredict: 80,
+      messages: [
+        { role: "system", content: sys },
+        { role: "user", content: question }
+      ],
+      externalSignal: getAskSignal()
+    });
+    const trimmed = raw?.trim();
+    return trimmed && trimmed.length > 5 ? trimmed : null;
+  } catch {
+    return null;
+  }
+}
+
+function getModelUnavailableMessage(lang: "ru" | "en" | "zh"): string {
+  return lang === "ru"
+    ? "Модель временно не отвечает. Проверьте: Ollama запущен? (ollama list) Подождите минуту или выберите режим Fast."
+    : lang === "zh"
+      ? "模型暂时无响应。请检查 Ollama 是否运行 (ollama list)，或稍后重试。"
+      : "Model temporarily unavailable. Check if Ollama is running (ollama list), wait a minute, or try Fast mode.";
+}
+
 function buildHardFallback(
   agentId: AgentId,
   lang: "ru" | "en" | "zh",
-  _question: string,
+  question: string,
   forecastMode: boolean,
   deepResearchMode: boolean
 ): string {
+  const trivial = getTrivialDirectAnswer(question, lang);
+  if (trivial) return trivial;
   if (forecastMode && agentId === "planner") {
     return lang === "ru"
       ? "Резервный прогноз: базовый сценарий. Ожидается движение в текущем диапазоне. Факторы: макро, регуляторика, геополитика, ликвидность."
@@ -267,7 +354,7 @@ function buildHardFallback(
   if (deepResearchMode) {
     return HARD_FALLBACK_BY_ROLE.pragmatist[lang];
   }
-  return HARD_FALLBACK_BY_ROLE[agentId][lang];
+  return getModelUnavailableMessage(lang);
 }
 
 async function checkOllamaAvailable(baseUrl: string): Promise<void> {
@@ -297,6 +384,7 @@ export async function askQuestion(
     throw new Error("Вопрос пустой.");
   }
   await checkOllamaAvailable(ollamaConfig.baseUrl);
+  preloadModel(ollamaConfig.baseUrl, "phi3", 12000).catch(() => {});
   const mode = request.mode ?? "balanced";
   const modeModels = getModelsForMode(mode);
   type AnswerLang = "ru" | "en" | "zh";
@@ -370,10 +458,10 @@ export async function askQuestion(
   const isFactualMode = webContext && !forecastMode;
   const getLanguageInstruction = (lang: AnswerLang) =>
     lang === "ru"
-      ? "\n\n[ЯЗЫК] Отвечай строго на русском языке. Не переключайся на английский."
+      ? "\n\n[ЯЗЫК — КРИТИЧНО] Весь ответ ТОЛЬКО на русском. Запрещено переключаться на английский или другие языки."
       : lang === "zh"
-        ? "\n\n[语言] 请严格使用简体中文回答。不要切换到其他语言。"
-        : "\n\n[LANGUAGE] Reply strictly in English. Do not switch to Russian.";
+        ? "\n\n[语言 — 必须] 请严格使用简体中文回答。禁止切换到其他语言。"
+        : "\n\n[LANGUAGE — CRITICAL] Reply ONLY in English. Do not switch to Russian or other languages.";
   const webInstruction = webContext
     ? isFactualMode
       ? "\n\n[ФАКТИЧЕСКИЙ РЕЖИМ] В сообщении пользователя есть блок «ИСТОЧНИКИ ИЗ ИНТЕРНЕТА». " +
@@ -477,12 +565,21 @@ export async function askQuestion(
       : baseNumPredict;
     const model = deepResearchMode
       ? modeModels.deepResearch
-      : (hasInputImages ? modeModels.imageFast : modeModels[a.id]);
+      : complexity === "simple"
+        ? modeModels.imageFast
+        : (hasInputImages ? modeModels.imageFast : modeModels[a.id]);
     return { ...a, model, numPredict };
   });
 
-  const maxAgents = Math.max(1, Math.min(4, request.maxAgents ?? 4));
-  const activeAgents = agentProfiles.slice(0, maxAgents);
+  const hasImages = (request.images?.filter((s) => s?.startsWith("data:image/")) ?? []).length > 0;
+  const useSingleAgentForSimple =
+    complexity === "simple" && !effectiveUseWebData && !hasImages;
+  const maxAgents = useSingleAgentForSimple
+    ? 1
+    : Math.max(1, Math.min(4, request.maxAgents ?? 4));
+  const activeAgents = useSingleAgentForSimple
+    ? agentProfiles.filter((a) => a.id === "explainer")
+    : agentProfiles.slice(0, maxAgents);
 
   let imageContext = "";
   const images = request.images?.filter((s) => s?.startsWith("data:image/")) ?? [];
@@ -594,7 +691,11 @@ export async function askQuestion(
   ): Promise<AgentAnswer> => {
     const start = performance.now();
     const model = agent.model;
-    const timeoutMs = deepResearchMode ? ollamaConfig.deepResearchTimeoutMs : ollamaConfig.timeoutMs;
+    const timeoutMs = deepResearchMode
+      ? ollamaConfig.deepResearchTimeoutMs
+      : complexity === "simple"
+        ? ollamaConfig.simpleTimeoutMs
+        : ollamaConfig.timeoutMs;
     try {
       const rawContent = await chatCompletion({
         baseUrl: ollamaConfig.baseUrl,
@@ -682,9 +783,14 @@ export async function askQuestion(
           onAgentAnswer?.(answer);
           return answer;
         } catch {
-          // fallback тоже упал — вернём штатную ошибку ниже
+          // fallback тоже упал — попробуем минимальный запрос
         }
       }
+      const minimalContent = await tryMinimalResponse(
+        ollamaConfig.baseUrl,
+        question,
+        getAnswerLang()
+      );
       const durationMs = Math.round(performance.now() - start);
       // #region agent log
       _dbg("orchestrator.ts:agentError", "agent failed", {
@@ -697,8 +803,10 @@ export async function askQuestion(
       const answer: AgentAnswer = {
         id: agent.id,
         title: agent.title,
-        content: buildHardFallback(agent.id, getAnswerLang(), question, forecastMode, deepResearchMode),
-        model: `${model} (hard-fallback)`,
+        content:
+          minimalContent ??
+          buildHardFallback(agent.id, getAnswerLang(), question, forecastMode, deepResearchMode),
+        model: minimalContent ? "phi3 (minimal)" : `${model} (hard-fallback)`,
         durationMs
       };
       onAgentAnswer?.(answer);
@@ -742,6 +850,20 @@ export async function askQuestion(
   }
 
   const aggStart = performance.now();
+
+  if (activeAgents.length === 1) {
+    const single = sanitizedAnswers[0];
+    return {
+      answers: sanitizedAnswers,
+      final: {
+        content: single.content,
+        model: single.model,
+        durationMs: Math.round(performance.now() - aggStart)
+      },
+      ...(webSources.length > 0 && { webSources: { query: question, results: webSources } })
+    };
+  }
+
   const judgeModeHint = isFactualMode
     ? "КРИТИЧНО: Ниже есть блок ИСТОЧНИКИ. Выбери ответ, который СОВПАДАЕТ с источниками. " +
       "ОТВЕРГНИ ответы с именами/фактами, которых НЕТ в источниках (это выдумки). "
