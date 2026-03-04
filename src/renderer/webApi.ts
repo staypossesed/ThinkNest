@@ -34,7 +34,7 @@ const DEMO_ANSWERS: AgentAnswer[] = [
 ];
 
 export function isWebMode(): boolean {
-  return typeof (window as unknown as { api?: unknown }).api === "undefined";
+  return (window as unknown as { __THINKNEST_WEB_MODE__?: boolean }).__THINKNEST_WEB_MODE__ === true;
 }
 
 export function createWebApi() {
@@ -78,8 +78,17 @@ export function createWebApi() {
     async consumeUsage(_question: string): Promise<ConsumeUsageResponse> {
       return { entitlements: DEMO_ENTITLEMENTS };
     },
-    async openCheckout(): Promise<{ ok: true }> {
+    async openCheckout(_plan?: "weekly" | "monthly" | "yearly"): Promise<{ ok: true }> {
       return { ok: true };
+    },
+    async getSubscription(): Promise<{
+      active: boolean;
+      plan: string | null;
+      interval: string | null;
+      currentPeriodEnd: string | null;
+      cancelAtPeriodEnd: boolean;
+    }> {
+      return { active: false, plan: null, interval: null, currentPeriodEnd: null, cancelAtPeriodEnd: false };
     },
     async openPortal(): Promise<{ ok: true }> {
       return { ok: true };

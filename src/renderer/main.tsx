@@ -6,8 +6,10 @@ import { isWebMode, createWebApi } from "./webApi";
 import "./styles.css";
 
 // Web mode (PWA в браузере): подменяем Electron API заглушками
-if (isWebMode()) {
-  (window as unknown as { api: unknown }).api = createWebApi();
+const win = window as unknown as { api?: unknown; __THINKNEST_WEB_MODE__?: boolean };
+if (typeof win.api === "undefined") {
+  win.__THINKNEST_WEB_MODE__ = true;
+  win.api = createWebApi();
   document.body.classList.add("web-mode");
 }
 

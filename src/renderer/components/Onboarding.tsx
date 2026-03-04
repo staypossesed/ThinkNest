@@ -26,6 +26,8 @@ interface PullProgress {
 interface OnboardingProps {
   uiLocale: UiLocale;
   onComplete: () => void;
+  /** When true, models run on server — skip Ollama setup */
+  useServerModels?: boolean;
 }
 
 const MODES: Array<{
@@ -68,8 +70,8 @@ const MODES: Array<{
 
 type Step = "welcome" | "check" | "mode" | "install" | "done";
 
-export default function Onboarding({ uiLocale, onComplete }: OnboardingProps) {
-  const [step, setStep] = useState<Step>("welcome");
+export default function Onboarding({ uiLocale, onComplete, useServerModels }: OnboardingProps) {
+  const [step, setStep] = useState<Step>(useServerModels ? "welcome" : "welcome");
   const [status, setStatus] = useState<OllamaStatus | null>(null);
   const [selectedMode, setSelectedMode] = useState<OllamaMode>("balanced");
   const [pullProgress, setPullProgress] = useState<Record<string, PullProgress>>({});
@@ -153,12 +155,12 @@ export default function Onboarding({ uiLocale, onComplete }: OnboardingProps) {
                   : "4 experts with different perspectives answer your question — more honest than a single ChatGPT."}
             </p>
             <div className="onboarding-features">
-              <div className="onboarding-feature">🔒 {loc === "ru" ? "100% локально — данные не покидают компьютер" : loc === "zh" ? "100% 本地 — 数据不离开电脑" : "100% local — data never leaves your computer"}</div>
+              <div className="onboarding-feature">🔒 {useServerModels ? (loc === "ru" ? "Модели на сервере — ничего устанавливать не нужно" : loc === "zh" ? "模型在服务器上 — 无需安装" : "Models on server — no installation needed") : (loc === "ru" ? "100% локально — данные не покидают компьютер" : loc === "zh" ? "100% 本地 — 数据不离开电脑" : "100% local — data never leaves your computer")}</div>
               <div className="onboarding-feature">🤝 {loc === "ru" ? "4 агента спорят и дают взвешенный ответ" : loc === "zh" ? "4个智能体争论并给出均衡答案" : "4 agents debate and give a balanced answer"}</div>
               <div className="onboarding-feature">🌐 {loc === "ru" ? "Поиск в интернете + анализ картинок" : loc === "zh" ? "网络搜索 + 图像分析" : "Web search + image analysis"}</div>
             </div>
-            <button className="onboarding-btn-primary" onClick={() => setStep("check")}>
-              {loc === "ru" ? "Начать настройку" : loc === "zh" ? "开始设置" : "Start Setup"}
+            <button className="onboarding-btn-primary" onClick={() => useServerModels ? onComplete() : setStep("check")}>
+              {useServerModels ? (loc === "ru" ? "Начать" : loc === "zh" ? "开始" : "Get Started") : (loc === "ru" ? "Начать настройку" : loc === "zh" ? "开始设置" : "Start Setup")}
             </button>
             <button className="onboarding-btn-link" onClick={skip}>
               {loc === "ru" ? "Пропустить (уже настроено)" : loc === "zh" ? "跳过（已配置）" : "Skip (already set up)"}
