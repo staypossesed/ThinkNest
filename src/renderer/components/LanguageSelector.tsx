@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { t } from "../i18n";
 
 export type UiLocale = "ru" | "en" | "zh";
 
@@ -35,10 +36,11 @@ export default function LanguageSelector({ value, onChange }: LanguageSelectorPr
         type="button"
         className="language-selector-trigger"
         onClick={() => setOpen(!open)}
-        title={current.label}
+        title={`${t(value, "answersIn")}: ${current.label}`}
         aria-expanded={open}
         aria-haspopup="listbox"
       >
+        <span className="language-selector-label">{t(value, "answersIn")}</span>
         <span className="language-selector-flag">{current.flag}</span>
       </button>
       {open && (

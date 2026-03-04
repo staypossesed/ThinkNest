@@ -53,7 +53,8 @@ export const translations: Record<
     ms: "мс",
     loadingInOtherChat: "Генерация ответа в другом чате",
     featureProOnly: "Только Pro — обновите план",
-    upgradeToPro: "Обновить до Pro"
+    upgradeToPro: "Обновить до Pro",
+    answersIn: "Ответы на"
   },
   en: {
     newChat: "New chat",
@@ -104,7 +105,8 @@ export const translations: Record<
     ms: "ms",
     loadingInOtherChat: "Generating response in another chat",
     featureProOnly: "Pro only — upgrade your plan",
-    upgradeToPro: "Upgrade to Pro"
+    upgradeToPro: "Upgrade to Pro",
+    answersIn: "Answers in"
   },
   zh: {
     newChat: "新对话",
@@ -155,7 +157,8 @@ export const translations: Record<
     ms: "毫秒",
     loadingInOtherChat: "正在其他对话中生成回答",
     featureProOnly: "仅 Pro — 升级至 Pro",
-    upgradeToPro: "升级至 Pro"
+    upgradeToPro: "升级至 Pro",
+    answersIn: "回答语言"
   }
 };
 
