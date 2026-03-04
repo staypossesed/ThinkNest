@@ -50,10 +50,14 @@ export function getModelsForMode(mode: OllamaMode = "balanced") {
   return MODE_MODELS[mode] ?? MODE_MODELS.balanced;
 }
 
+const SIMPLE_TIMEOUT_MS = 25000;
+
 export const ollamaConfig = {
   baseUrl: process.env.OLLAMA_BASE_URL ?? "http://localhost:11434/v1",
   /** Таймаут на агента — 60 сек. Быстрые модели не должны зависать. */
   timeoutMs: Number(process.env.OLLAMA_TIMEOUT_MS ?? 60000),
+  /** Таймаут для простых вопросов (phi3). */
+  simpleTimeoutMs: Number(process.env.OLLAMA_SIMPLE_TIMEOUT_MS ?? SIMPLE_TIMEOUT_MS),
   /** Таймаут для vision (llava) — 45 сек, чтобы не подвисать надолго. */
   visionTimeoutMs: Number(process.env.OLLAMA_VISION_TIMEOUT_MS ?? 45000),
   /** Ограничение параллелизма агентов (на CPU 2 обычно быстрее, чем 4). */

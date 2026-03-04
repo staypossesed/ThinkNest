@@ -56,18 +56,29 @@ app.whenReady().then(() => {
     const onToken = (agentId: string, token: string) => {
       event.sender.send("ask:token", { agentId, token });
     };
-    let filteredPayload = payload;
+
     if (!isDevMode) {
-      const ent = await backendClient.getEntitlements();
-      filteredPayload = {
-        ...payload,
-        useWebData: payload.useWebData && (ent.allowWebData !== false),
-        forecastMode: payload.forecastMode && (ent.allowForecast !== false),
-        debateMode: true,
-        expertProfile: ent.allowExpertProfile !== false ? payload.expertProfile : undefined,
-        memoryContext: ent.allowMemory !== false ? payload.memoryContext : undefined
-      };
+      try {
+        const response = await backendClient.ask(payload);
+        for (const answer of response.answers) {
+          onAnswer(answer);
+        }
+        return response;
+      } finally {
+        clearAskLocale();
+      }
     }
+
+    let filteredPayload = payload;
+    const ent = await backendClient.getEntitlements();
+    filteredPayload = {
+      ...payload,
+      useWebData: payload.useWebData && (ent.allowWebData !== false),
+      forecastMode: payload.forecastMode && (ent.allowForecast !== false),
+      debateMode: true,
+      expertProfile: ent.allowExpertProfile !== false ? payload.expertProfile : undefined,
+      memoryContext: ent.allowMemory !== false ? payload.memoryContext : undefined
+    };
     try {
       return await askQuestion(
         filteredPayload,
@@ -97,11 +108,12 @@ app.whenReady().then(() => {
   ipcMain.handle("usage:consume", async (_event, question: string) =>
     backendClient.consumeUsage(question)
   );
-  ipcMain.handle("billing:checkout", async () => {
-    const url = await backendClient.createCheckoutUrl();
+  ipcMain.handle("billing:checkout", async (_event, plan: "weekly" | "monthly" | "yearly" = "monthly") => {
+    const url = await backendClient.createCheckoutUrl(plan);
     await shell.openExternal(url);
     return { ok: true };
   });
+  ipcMain.handle("billing:subscription", async () => backendClient.getSubscription());
   ipcMain.handle("billing:portal", async () => {
     const url = await backendClient.createPortalUrl();
     await shell.openExternal(url);

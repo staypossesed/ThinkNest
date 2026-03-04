@@ -2,6 +2,8 @@ import path from "node:path";
 import { promises as fs } from "node:fs";
 import { app, shell } from "electron";
 import {
+  AskRequest,
+  AskResponse,
   CanAskResponse,
   ConsumeUsageResponse,
   Entitlements,
@@ -12,9 +14,8 @@ import {
 const backendBaseUrl = process.env.BACKEND_API_URL ?? "http://localhost:8787";
 const sessionFilePath = path.join(app.getPath("userData"), "session.json");
 
-/** Режим разработки: без backend, 4 агента, без лимитов. Для тестирования и доработки. */
-export const isDevMode =
-  process.env.DEV_MODE === "true" || process.env.NODE_ENV === "development";
+/** Режим разработки: без backend, локальный Ollama. Только при npm run dev:local (DEV_MODE=true). */
+export const isDevMode = process.env.DEV_MODE === "true";
 
 const DEV_USER: UserProfile = {
   id: "dev",
@@ -128,19 +129,49 @@ class BackendClient {
     );
   }
 
-  async createCheckoutUrl(): Promise<string> {
+  async ask(payload: AskRequest): Promise<AskResponse> {
+    if (isDevMode) {
+      throw new Error("Use local orchestrator in dev mode.");
+    }
+    return this.request<AskResponse>(
+      "/ask",
+      {
+        method: "POST",
+        body: JSON.stringify(payload)
+      },
+      true
+    );
+  }
+
+  async createCheckoutUrl(plan: "weekly" | "monthly" | "yearly" = "monthly"): Promise<string> {
     if (isDevMode) {
       throw new Error("Режим разработки: оплата отключена.");
     }
     const response = await this.request<{ url: string | null }>(
       "/billing/checkout",
-      { method: "POST" },
+      {
+        method: "POST",
+        body: JSON.stringify({ plan })
+      },
       true
     );
     if (!response.url) {
       throw new Error("Stripe checkout URL is missing.");
     }
     return response.url;
+  }
+
+  async getSubscription(): Promise<{
+    active: boolean;
+    plan: string | null;
+    interval: string | null;
+    currentPeriodEnd: string | null;
+    cancelAtPeriodEnd: boolean;
+  }> {
+    if (isDevMode) {
+      return { active: true, plan: "pro", interval: "monthly", currentPeriodEnd: null, cancelAtPeriodEnd: false };
+    }
+    return this.request("/billing/subscription", { method: "GET" }, true);
   }
 
   async createPortalUrl(): Promise<string> {
