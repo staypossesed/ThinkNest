@@ -22,7 +22,10 @@ const envSchema = z.object({
   GOOGLE_REDIRECT_URI: z.string().url(),
   STRIPE_SECRET_KEY: optionalString,
   STRIPE_WEBHOOK_SECRET: optionalString,
-  STRIPE_PRICE_PRO_MONTHLY: optionalString,
+  STRIPE_PRICE_WEEKLY: optionalString,
+  STRIPE_PRICE_MONTHLY: optionalString,
+  STRIPE_PRICE_YEARLY: optionalString,
+  STRIPE_COUPON_1PLUS1: optionalString,
   STRIPE_SUCCESS_URL: optionalUrl,
   STRIPE_CANCEL_URL: optionalUrl
 });
@@ -37,9 +40,21 @@ if (!parsed.success) {
 }
 
 export const config = parsed.data;
+
+function getStripePriceIds(): { weekly?: string; monthly?: string; yearly?: string } {
+  const w = config.STRIPE_PRICE_WEEKLY;
+  const m = config.STRIPE_PRICE_MONTHLY;
+  const y = config.STRIPE_PRICE_YEARLY;
+  return { weekly: w, monthly: m, yearly: y };
+}
+
+export const stripePriceIds = getStripePriceIds();
+
 export const stripeEnabled =
   Boolean(config.STRIPE_SECRET_KEY) &&
   Boolean(config.STRIPE_WEBHOOK_SECRET) &&
-  Boolean(config.STRIPE_PRICE_PRO_MONTHLY) &&
   Boolean(config.STRIPE_SUCCESS_URL) &&
-  Boolean(config.STRIPE_CANCEL_URL);
+  Boolean(config.STRIPE_CANCEL_URL) &&
+  (Boolean(config.STRIPE_PRICE_WEEKLY) ||
+    Boolean(config.STRIPE_PRICE_MONTHLY) ||
+    Boolean(config.STRIPE_PRICE_YEARLY));
