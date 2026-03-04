@@ -13,6 +13,7 @@ import MessageInput from "./components/MessageInput";
 import LanguageSelector, { type UiLocale } from "./components/LanguageSelector";
 import Onboarding from "./components/Onboarding";
 import MemoryPanel from "./components/MemoryPanel";
+import UpgradeModal from "./components/UpgradeModal";
 import { useConversations } from "./hooks/useConversations";
 import { usePlaceholder } from "./hooks/usePlaceholder";
 import { useMemory } from "./hooks/useMemory";
@@ -23,6 +24,15 @@ const ONBOARDING_DONE_KEY = "thinknest_onboarding_done";
 const MODE_STORAGE_KEY = "thinknest_mode";
 
 const LANG_STORAGE_KEY = "thinknest_ui_locale";
+
+/** Определяет язык вопроса по символам (кириллица, CJK, латиница) */
+function detectQuestionLanguage(input: string): UiLocale {
+  const t = input.trim();
+  if (!t.length) return "en";
+  if (/[\u4E00-\u9FFF\u3400-\u4DBF]/.test(t)) return "zh";
+  if (/[\u0400-\u04FF]/.test(t)) return "ru";
+  return "en";
+}
 
 function detectSystemLocale(): UiLocale {
   if (typeof navigator === "undefined") return "ru";
@@ -43,6 +53,13 @@ export default function App() {
   const [deepResearchMode, setDeepResearchMode] = useState(false);
   const [expertProfile, setExpertProfile] = useState("");
   const [showMemoryPanel, setShowMemoryPanel] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [subscription, setSubscription] = useState<{
+    active: boolean;
+    interval: string | null;
+    currentPeriodEnd: string | null;
+    cancelAtPeriodEnd: boolean;
+  } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try { return localStorage.getItem("thinknest_sidebar_collapsed") === "1"; } catch { return false; }
@@ -131,6 +148,14 @@ export default function App() {
         if (isDev || currentSession.token) {
           const currentEntitlements = await window.api.getEntitlements();
           setEntitlements(currentEntitlements);
+          if (currentSession.token && window.api.getSubscription) {
+            try {
+              const sub = await window.api.getSubscription();
+              setSubscription(sub);
+            } catch {
+              setSubscription(null);
+            }
+          }
         }
       } catch (err) {
         const message =
@@ -143,9 +168,18 @@ export default function App() {
     bootstrap();
   }, []);
 
-  const refreshEntitlements = async () => {
+  const refreshEntitlements = async (sessionOverride?: SessionState) => {
     const current = await window.api.getEntitlements();
     setEntitlements(current);
+    const sess = sessionOverride ?? session;
+    try {
+      if (window.api.getSubscription && sess.token) {
+        const sub = await window.api.getSubscription();
+        setSubscription(sub);
+      }
+    } catch {
+      setSubscription(null);
+    }
   };
 
   const handleLogin = async () => {
@@ -154,7 +188,7 @@ export default function App() {
     try {
       const nextSession = await window.api.loginWithGoogle();
       setSession(nextSession);
-      await refreshEntitlements();
+      await refreshEntitlements(nextSession);
     } catch (err) {
       const message = err instanceof Error ? err.message : t(uiLocale, "loginFailed");
       setError(message);
@@ -168,12 +202,19 @@ export default function App() {
     await window.api.logout();
     setSession({ token: null, user: null });
     setEntitlements(null);
+    setSubscription(null);
   };
 
-  const handleUpgrade = async () => {
+  const handleUpgrade = () => {
     setError(null);
+    setShowUpgradeModal(true);
+  };
+
+  const handleSelectPlan = async (plan: "weekly" | "monthly" | "yearly") => {
+    setError(null);
+    setShowUpgradeModal(false);
     try {
-      await window.api.openCheckout();
+      await window.api.openCheckout(plan);
     } catch (err) {
       const message = err instanceof Error ? err.message : t(uiLocale, "checkoutFailed");
       setError(message);
@@ -248,7 +289,11 @@ export default function App() {
         return;
       }
 
-      const preferredLocale: "ru" | "en" | "zh" = uiLocale;
+      const detectedLang = questionText !== "[Изображение]" ? detectQuestionLanguage(questionText) : uiLocale;
+      const preferredLocale: "ru" | "en" | "zh" = detectedLang;
+      if (detectedLang !== uiLocale) {
+        handleLocaleChange(detectedLang);
+      }
       const ent = canAsk.entitlements;
 
       const mode = (() => {
@@ -336,6 +381,7 @@ export default function App() {
     {showOnboarding && !isWebMode() && (
       <Onboarding
         uiLocale={uiLocale}
+        useServerModels={!devMode}
         onComplete={() => {
           try { localStorage.setItem(ONBOARDING_DONE_KEY, "1"); } catch {}
           setShowOnboarding(false);
@@ -363,6 +409,7 @@ export default function App() {
         loadingSession={loadingSession}
         uiLocale={uiLocale}
         mobileOpen={sidebarOpen}
+        subscription={subscription}
         onMobileClose={() => setSidebarOpen(false)}
         collapsed={sidebarCollapsed}
         onCollapseToggle={() => {
@@ -438,6 +485,13 @@ export default function App() {
         onChange={setMemory}
         uiLocale={uiLocale}
         onClose={() => setShowMemoryPanel(false)}
+      />
+    )}
+    {showUpgradeModal && (
+      <UpgradeModal
+        uiLocale={uiLocale}
+        onClose={() => setShowUpgradeModal(false)}
+        onSelectPlan={handleSelectPlan}
       />
     )}
     </>
