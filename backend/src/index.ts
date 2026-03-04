@@ -8,6 +8,7 @@ import { registerBillingRoutes } from "./billing/routes";
 import { registerWebhookRoutes } from "./webhooks/routes";
 import { registerEntitlementRoutes } from "./entitlements/routes";
 import { registerPortalRoutes } from "./portal/routes";
+import { registerAskRoutes } from "./ask/routes";
 
 const app = Fastify({
   logger: true
@@ -55,6 +56,7 @@ async function bootstrap(): Promise<void> {
   await registerWebhookRoutes(app);
   await registerEntitlementRoutes(app);
   await registerPortalRoutes(app);
+  await registerAskRoutes(app);
 
   await app.listen({ host: "0.0.0.0", port: config.PORT });
 }
