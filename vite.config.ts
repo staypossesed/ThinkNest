@@ -42,7 +42,19 @@ export default defineConfig(({ command }) => ({
   publicDir: path.resolve(__dirname, "public"),
   server: {
     port: 5173,
-    host: true
+    host: true,
+    // Прокси бэкенда — для ngrok с одним туннелем (VITE_BACKEND_URL=)
+    proxy: {
+      "/health": "http://localhost:8787",
+      "/auth": "http://localhost:8787",
+      "/me": "http://localhost:8787",
+      "/ask": "http://localhost:8787",
+      "/entitlements": "http://localhost:8787",
+      "/usage": "http://localhost:8787",
+      "/billing": "http://localhost:8787",
+      "/portal": "http://localhost:8787",
+      "/webhooks": "http://localhost:8787"
+    }
   },
   optimizeDeps: {
     // Не пребандлить transformers — загружается по требованию при голосовом вводе
