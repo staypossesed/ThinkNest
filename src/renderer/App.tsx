@@ -376,7 +376,7 @@ export default function App() {
   return (
     <>
     <div className="web-mode-banner" role="status">
-      📱 Режим просмотра — для полной работы установите десктопное приложение
+      📱 Веб-режим — войдите через Google и задавайте вопросы с мобилки
     </div>
     {showOnboarding && !isWebMode() && (
       <Onboarding
