@@ -15,8 +15,11 @@ const app = Fastify({
   logger: true
 });
 
+const corsOrigins = config.APP_ORIGINS
+  ? [config.APP_ORIGIN, ...config.APP_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean)]
+  : [config.APP_ORIGIN];
 app.register(cors, {
-  origin: [config.APP_ORIGIN],
+  origin: corsOrigins,
   credentials: true
 });
 

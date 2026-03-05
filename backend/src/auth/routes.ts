@@ -63,12 +63,15 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
 
     cleanOldAuthStates();
     const state = randomUUID();
+    const redirectPath =
+      query.redirect?.startsWith("http") ? query.redirect
+        : query.redirect?.startsWith("/") ? query.redirect
+        : "/portal";
     pendingAuthStates.set(state, {
       createdAt: Date.now(),
       done: false,
       mode: query.mode ?? "desktop",
-      redirectPath:
-        query.redirect && query.redirect.startsWith("/") ? query.redirect : "/portal"
+      redirectPath
     });
     return { state, authUrl: createGoogleAuthUrl(state) };
   });

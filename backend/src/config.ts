@@ -14,6 +14,8 @@ const optionalUrl = z.preprocess(
 const envSchema = z.object({
   PORT: z.coerce.number().default(8787),
   APP_ORIGIN: z.string().default("http://localhost:5173"),
+  /** Доп. origins для CORS (мобилка в сети): http://192.168.1.100:5173 */
+  APP_ORIGINS: z.string().optional(),
   APP_JWT_SECRET: z.string().min(16),
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
