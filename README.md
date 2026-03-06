@@ -66,6 +66,13 @@ npm run dev
 
 **Требование:** Ollama должен быть запущен на машине с backend (или укажи `OLLAMA_BASE_URL` в `backend/.env` на удалённый сервер). Модели: `ollama pull phi3 mistral llama3.1 llava`
 
+**Web-режим (браузер, мобилка):**
+```bash
+npm run dev:backend
+npm run dev:renderer
+```
+Открой `http://localhost:5173` в браузере. Для доступа с телефона используй ngrok: `ngrok http 5173`, добавь ngrok URL в `backend/.env` (APP_ORIGINS, GOOGLE_REDIRECT_URI) и в Google OAuth.
+
 ## 2) Настройка Supabase
 
 1. Создай проект в Supabase.
