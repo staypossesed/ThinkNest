@@ -13,10 +13,13 @@ import type {
 
 const TOKEN_KEY = "thinknest_web_token";
 
+/**
+ * Base URL for backend API. Empty = same origin (Vite proxy).
+ * Set VITE_BACKEND_URL for custom backend (e.g. production).
+ */
 function getBackendUrl(): string {
   const env = import.meta.env.VITE_BACKEND_URL as string | undefined;
   if (env && env.trim()) return env.replace(/\/$/, "");
-  // Всегда через прокси Vite — избегаем CORS, один origin
   return "";
 }
 
