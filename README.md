@@ -157,6 +157,10 @@ npm run package
 **Итог без ссылок на модели:**
 - Агрегатор теперь добавляет блок **Источники:** с перечислением агентов, давших вклад.
 
+**Web mode: "Backend недоступен":**
+- Запусти `npm run dev:backend` и `npm run dev:renderer`, открой `http://localhost:5173` в браузере (не Electron).
+- Для ngrok: создай Web OAuth client в Google Console, добавь ngrok URL в APP_ORIGINS и GOOGLE_REDIRECT_URI.
+
 ## 10) QA чеклист (e2e)
 
 - [ ] Google login проходит успешно и сессия сохраняется.
