@@ -32,3 +32,20 @@ ThinkNest is a desktop app with 4 AI agents (Planner, Critic, Pragmatist, Explai
    npm run dev
    ```
    Opens the Electron app. Ollama must be running.
+
+### Web Mode (browser / mobile)
+
+Run backend + frontend, open in browser:
+
+```bash
+npm run dev:backend
+npm run dev:renderer
+```
+
+Open **http://localhost:5173** in Chrome or Edge (not Electron). Sign in with Google to ask questions.
+
+For mobile access: use `ngrok http 5173` and add the ngrok URL to `backend/.env` and Google OAuth. See [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md).
+
+### Full Setup
+
+See [README.md](./README.md) for Supabase, Google OAuth, Stripe, and deployment.
