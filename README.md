@@ -1,5 +1,7 @@
 # Multi Agent Desktop (Free/Pro MVP)
 
+> **Read this first:** [README_FIRST.md](./README_FIRST.md) — quick start in English and Russian.
+
 Desktop-приложение на Electron + React с 4 AI-агентами и итоговым агрегатором.
 
 > **Публикация репо:** см. [PUBLISHING.md](./PUBLISHING.md) — как сделать репо публичным без утечки секретов.
