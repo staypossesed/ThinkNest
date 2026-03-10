@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { Settings } from "lucide-react";
 import logo from "../assets/logo.svg";
 import type { Conversation, SessionState, Entitlements } from "../../shared/types";
 import type { UiLocale } from "./LanguageSelector";
@@ -118,7 +119,7 @@ export default function ChatSidebar({
     <>
       {mobileOpen && (
         <div
-          className="chat-sidebar-backdrop"
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
           onClick={onMobileClose}
           onKeyDown={(e) => e.key === "Escape" && onMobileClose?.()}
           role="button"
@@ -126,31 +127,41 @@ export default function ChatSidebar({
           aria-label="Close menu"
         />
       )}
-    <aside className={`chat-sidebar ${mobileOpen ? "chat-sidebar--mobile-open" : ""} ${collapsed ? "chat-sidebar--collapsed" : ""}`}>
+    <aside
+      className={`relative flex w-[260px] shrink-0 flex-col border-r border-white/10 bg-white/5 backdrop-blur-xl transition-all duration-200 ${
+        collapsed ? "w-0 min-w-0 overflow-hidden border-r-0" : ""
+      } ${mobileOpen ? "fixed inset-y-0 left-0 z-50" : ""}`}
+    >
       {(onMobileClose || onCollapseToggle) && (
         <button
           type="button"
-          className="chat-sidebar-close"
+          className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
           onClick={() => (isMobile ? onMobileClose?.() : onCollapseToggle?.())}
           aria-label={isMobile ? (uiLocale === "ru" ? "Закрыть" : "Close") : (uiLocale === "ru" ? "Свернуть меню" : "Collapse sidebar")}
         >
           ×
         </button>
       )}
-      <div className="chat-sidebar-brand">
-        <img src={logo} alt="" className="chat-sidebar-logo" />
-        <span className="chat-sidebar-title">ThinkNest</span>
+      <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5">
+        <img src={logo} alt="" className="h-9 w-9 object-contain" />
+        <span className="text-lg font-bold tracking-tight text-white">ThinkNest</span>
       </div>
-      <button type="button" className="chat-sidebar-new" onClick={onNewChat}>
+      <button
+        type="button"
+        className="mx-4 mt-4 flex w-[calc(100%-32px)] items-center justify-center rounded-xl bg-purple-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-purple-500"
+        onClick={onNewChat}
+      >
         {t(uiLocale, "newChatBtn")}
       </button>
-      <div className="chat-sidebar-list">
+      <div className="flex-1 overflow-y-auto py-2">
         {conversations.map((c) => (
           <div
             key={c.id}
             role="button"
             tabIndex={0}
-            className={`chat-sidebar-item ${c.id === activeId ? "chat-sidebar-item--active" : ""}`}
+            className={`mx-2 flex items-center gap-2 rounded-xl px-3 py-2.5 transition-all duration-200 hover:bg-white/10 ${
+              c.id === activeId ? "bg-white/10" : ""
+            }`}
             onClick={() => onSelect(c.id)}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
@@ -159,17 +170,15 @@ export default function ChatSidebar({
               }
             }}
           >
-            <div className="chat-sidebar-item-content">
-              <span className="chat-sidebar-item-preview">
+            <div className="min-w-0 flex-1">
+              <span className="block truncate text-sm text-white">
                 {getPreview(c.messages[0]?.question ?? t(uiLocale, "newChat"))}
               </span>
-              <span className="chat-sidebar-item-date">
-                {formatDate(c.updatedAt, uiLocale)}
-              </span>
+              <span className="text-xs text-gray-500">{formatDate(c.updatedAt, uiLocale)}</span>
             </div>
             <button
               type="button"
-              className="chat-sidebar-item-delete"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-gray-500 opacity-60 transition-opacity hover:opacity-100 hover:text-red-400"
               onClick={(e) => handleDeleteClick(e, c.id)}
               aria-label={t(uiLocale, "delete")}
             >
@@ -178,21 +187,30 @@ export default function ChatSidebar({
           </div>
         ))}
       </div>
-      <div className="chat-sidebar-footer">
+      <div className="border-t border-white/10 p-4">
         {devMode ? (
-          <span className="chat-sidebar-badge">Dev</span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs font-medium text-emerald-400">Dev</span>
+            <button
+              type="button"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-white/10 hover:text-white"
+              title="Settings"
+            >
+              <Settings className="h-4 w-4" />
+            </button>
+          </div>
         ) : session.user ? (
           <>
-            <p className="chat-sidebar-meta">
+            <p className="text-xs text-gray-500">
               {profileName} • {entitlements?.plan ?? "—"}
             </p>
             {entitlements && (
-              <p className="chat-sidebar-meta">
+              <p className="text-xs text-gray-500">
                 {entitlements.usedQuestions}/{entitlements.maxQuestions}
               </p>
             )}
             {subscription?.active && subscription.currentPeriodEnd && (
-              <p className="chat-sidebar-meta chat-sidebar-billing">
+              <p className="mt-1 text-xs text-gray-500">
                 {subscription.cancelAtPeriodEnd
                   ? (uiLocale === "ru"
                       ? "Отмена после периода"
@@ -210,34 +228,66 @@ export default function ChatSidebar({
                     )}
               </p>
             )}
-            <div className="chat-sidebar-actions">
-              <button type="button" onClick={onRefreshPlan}>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded-lg px-3 py-1.5 text-xs text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
+                onClick={onRefreshPlan}
+              >
                 {t(uiLocale, "refresh")}
               </button>
               {entitlements?.plan === "free" && (
-                <button type="button" onClick={onUpgrade}>
+                <button
+                  type="button"
+                  className="rounded-lg px-3 py-1.5 text-xs text-purple-400 transition-colors hover:bg-white/10"
+                  onClick={onUpgrade}
+                >
                   {t(uiLocale, "pro")}
                 </button>
               )}
               {entitlements?.plan === "pro" && (
-                <button type="button" onClick={onManageBilling}>
+                <button
+                  type="button"
+                  className="rounded-lg px-3 py-1.5 text-xs text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
+                  onClick={onManageBilling}
+                >
                   {t(uiLocale, "billing")}
                 </button>
               )}
-              <button type="button" onClick={onLogout}>
+              <button
+                type="button"
+                className="rounded-lg px-3 py-1.5 text-xs text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
+                onClick={onLogout}
+              >
                 {t(uiLocale, "logout")}
               </button>
             </div>
+            <button
+              type="button"
+              className="mt-2 flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-white/10 hover:text-white"
+              title="Settings"
+            >
+              <Settings className="h-4 w-4" />
+            </button>
           </>
         ) : (
-          <button
-            type="button"
-            onClick={onLogin}
-            disabled={loadingSession}
-            className="chat-sidebar-login"
-          >
-            {loadingSession ? t(uiLocale, "loginGoogleLoading") : t(uiLocale, "loginGoogle")}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={onLogin}
+              disabled={loadingSession}
+              className="w-full rounded-xl bg-purple-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-purple-500 disabled:opacity-50"
+            >
+              {loadingSession ? t(uiLocale, "loginGoogleLoading") : t(uiLocale, "loginGoogle")}
+            </button>
+            <button
+              type="button"
+              className="mt-2 flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-white/10 hover:text-white"
+              title="Settings"
+            >
+              <Settings className="h-4 w-4" />
+            </button>
+          </>
         )}
       </div>
 
