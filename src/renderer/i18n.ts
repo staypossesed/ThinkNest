@@ -24,6 +24,8 @@ export const translations: Record<
     welcomeTitle: "Multi Agent Desktop",
     welcomeText: "4 эксперта отвечают на ваш вопрос. Задайте вопрос или начните новый чат.",
     expertsRespond: "4 эксперта отвечают",
+    perspectivesHeader: "4 PERSPECTIVES • 1 FINAL ANSWER",
+    bestAnswer: "Лучший ответ",
     formingResult: "Формирую итог...",
     planner: "Планировщик",
     critic: "Критик",
@@ -54,7 +56,8 @@ export const translations: Record<
     loadingInOtherChat: "Генерация ответа в другом чате",
     featureProOnly: "Только Pro — обновите план",
     upgradeToPro: "Обновить до Pro",
-    answersIn: "Ответы на"
+    answersIn: "Ответы на",
+    copy: "Копировать"
   },
   en: {
     newChat: "New chat",
@@ -76,6 +79,8 @@ export const translations: Record<
     welcomeTitle: "Multi Agent Desktop",
     welcomeText: "4 experts answer your question. Ask a question or start a new chat.",
     expertsRespond: "4 experts respond",
+    perspectivesHeader: "4 PERSPECTIVES • 1 FINAL ANSWER",
+    bestAnswer: "Best Answer",
     formingResult: "Forming result...",
     planner: "Planner",
     critic: "Critic",
@@ -106,7 +111,8 @@ export const translations: Record<
     loadingInOtherChat: "Generating response in another chat",
     featureProOnly: "Pro only — upgrade your plan",
     upgradeToPro: "Upgrade to Pro",
-    answersIn: "Answers in"
+    answersIn: "Answers in",
+    copy: "Copy"
   },
   zh: {
     newChat: "新对话",
@@ -128,6 +134,8 @@ export const translations: Record<
     welcomeTitle: "Multi Agent Desktop",
     welcomeText: "4 位专家回答您的问题。提问或开始新对话。",
     expertsRespond: "4 位专家回答",
+    perspectivesHeader: "4 PERSPECTIVES • 1 FINAL ANSWER",
+    bestAnswer: "最佳答案",
     formingResult: "正在生成结果...",
     planner: "规划师",
     critic: "批评家",
@@ -158,7 +166,8 @@ export const translations: Record<
     loadingInOtherChat: "正在其他对话中生成回答",
     featureProOnly: "仅 Pro — 升级至 Pro",
     upgradeToPro: "升级至 Pro",
-    answersIn: "回答语言"
+    answersIn: "回答语言",
+    copy: "复制"
   }
 };
 

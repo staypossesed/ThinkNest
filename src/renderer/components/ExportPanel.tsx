@@ -53,11 +53,21 @@ export default function ExportPanel({ question, answers, final, uiLocale }: Prop
   };
 
   return (
-    <div className="export-buttons">
-      <button className="export-btn" onClick={exportMarkdown} title="Export Markdown">
+    <div className="mt-3 flex flex-wrap gap-2">
+      <button
+        type="button"
+        onClick={exportMarkdown}
+        title="Export Markdown"
+        className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
+      >
         📄 {uiLocale === "ru" ? "Скачать MD" : uiLocale === "zh" ? "下载 MD" : "Download MD"}
       </button>
-      <button className="export-btn" onClick={copyMarkdown} title="Copy Markdown">
+      <button
+        type="button"
+        onClick={copyMarkdown}
+        title="Copy Markdown"
+        className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
+      >
         📋 {uiLocale === "ru" ? "Копировать" : uiLocale === "zh" ? "复制" : "Copy"}
       </button>
       <ShareButton question={question} answers={answers} final={final} uiLocale={uiLocale} />

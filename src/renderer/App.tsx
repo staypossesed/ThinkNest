@@ -289,11 +289,8 @@ export default function App() {
         return;
       }
 
-      const detectedLang = questionText !== "[Изображение]" ? detectQuestionLanguage(questionText) : uiLocale;
-      const preferredLocale: "ru" | "en" | "zh" = detectedLang;
-      if (detectedLang !== uiLocale) {
-        handleLocaleChange(detectedLang);
-      }
+      // Force English for all agent responses and Final Answer
+      const preferredLocale: "ru" | "en" | "zh" = "en";
       const ent = canAsk.entitlements;
 
       const mode = (() => {
@@ -388,7 +385,7 @@ export default function App() {
         }}
       />
     )}
-    <div className="app app--chat">
+    <div className="flex h-full min-h-screen bg-[#050505]">
       <ChatSidebar
         conversations={conversations}
         activeId={activeId}
@@ -420,11 +417,11 @@ export default function App() {
           });
         }}
       />
-      <main className="app-main">
-        <div className={`chat-topbar ${sidebarCollapsed ? "chat-topbar--sidebar-collapsed" : ""}`}>
+      <main className="flex flex-1 flex-col min-w-0 overflow-hidden">
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-white/10 bg-[#050505] px-5 py-3">
           <button
             type="button"
-            className="chat-topbar-menu"
+            className={`flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-gray-400 transition-colors hover:bg-white/10 hover:text-white ${!sidebarCollapsed ? "md:hidden" : ""}`}
             onClick={() => {
               if (sidebarCollapsed) {
                 setSidebarCollapsed(false);
@@ -437,7 +434,7 @@ export default function App() {
           >
             ☰
           </button>
-          <div className="chat-topbar-spacer" />
+          <div className="flex-1" />
           <LanguageSelector value={uiLocale} onChange={handleLocaleChange} />
         </div>
         <ChatMain
@@ -447,7 +444,7 @@ export default function App() {
           uiLocale={uiLocale}
           streamingTokens={isLoadingInCurrentChat ? streamingTokens : {}}
         />
-        <div className="app-input-wrap">
+        <div className="shrink-0 border-t border-white/10">
           <MessageInput
             value={question}
             onChange={setQuestion}

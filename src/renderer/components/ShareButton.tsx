@@ -80,7 +80,12 @@ export default function ShareButton({ question, answers, final, uiLocale }: Prop
     : (uiLocale === "ru" ? "🔗 Поделиться" : uiLocale === "zh" ? "🔗 分享" : "🔗 Share");
 
   return (
-    <button className="export-btn" onClick={share} title="Share">
+    <button
+      type="button"
+      onClick={share}
+      title="Share"
+      className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
+    >
       {label}
     </button>
   );
