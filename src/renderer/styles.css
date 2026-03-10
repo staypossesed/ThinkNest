@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   --bg-primary: #0c0e12;
   --bg-card: #161a21;
@@ -21,6 +23,21 @@
   --agent-explainer: #8b5cf6;
 }
 
+.animate-card-in {
+  animation: cardFadeIn 0.35s ease-out forwards;
+}
+
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -37,7 +54,7 @@ body {
 
 body {
   font-family: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
-  background: var(--bg-primary);
+  background: #050505;
   color: var(--text-primary);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
