@@ -7,7 +7,7 @@ const MODE_STORAGE_KEY = "thinknest_mode";
 export type OllamaMode = "fast" | "balanced" | "quality";
 
 /** Модели устанавливаются автоматически — фиксированный набор */
-const REQUIRED_MODELS = ["phi3", "mistral", "llama3.1", "llava"] as const;
+const REQUIRED_MODELS = ["llama3.2:3b", "qwen2.5:3b", "deepseek-r1:7b", "llava"] as const;
 
 interface OllamaStatus {
   installed: boolean;
@@ -41,9 +41,9 @@ const MODES: Array<{
     emoji: "⚡",
     label: { ru: "Быстрый", en: "Fast", zh: "快速" },
     desc: {
-      ru: "Максимальная скорость, phi3",
-      en: "Maximum speed, phi3",
-      zh: "最快速度，phi3"
+      ru: "Максимальная скорость, llama3.2",
+      en: "Maximum speed, llama3.2",
+      zh: "最快速度，llama3.2"
     }
   },
   {
@@ -51,9 +51,9 @@ const MODES: Array<{
     emoji: "⚖️",
     label: { ru: "Сбалансированный", en: "Balanced", zh: "平衡" },
     desc: {
-      ru: "Мistral — баланс скорости и качества",
-      en: "Mistral — balance of speed and quality",
-      zh: "Mistral — 速度与质量平衡"
+      ru: "llama3.2 + qwen2.5 — баланс скорости и качества",
+      en: "llama3.2 + qwen2.5 — balance of speed and quality",
+      zh: "llama3.2 + qwen2.5 — 速度与质量平衡"
     }
   },
   {
@@ -61,9 +61,9 @@ const MODES: Array<{
     emoji: "🎯",
     label: { ru: "Качественный", en: "Quality", zh: "高质量" },
     desc: {
-      ru: "Llama 3.1 — лучшее качество ответов",
-      en: "Llama 3.1 — best answer quality",
-      zh: "Llama 3.1 — 最佳回答质量"
+      ru: "llama3.2 — лучшее качество ответов",
+      en: "llama3.2 — best answer quality",
+      zh: "llama3.2 — 最佳回答质量"
     }
   }
 ];

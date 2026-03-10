@@ -128,23 +128,23 @@ export const HARDWARE_PROFILES = {
   light: {
     label: "Слабый CPU (4–8 GB RAM)",
     labelEn: "Light CPU (4–8 GB RAM)",
-    models: ["phi3"],
-    agentModel: "phi3",
-    aggregatorModel: "phi3"
+    models: ["phi4:mini", "llama3.2:3b"],
+    agentModel: "phi4:mini",
+    aggregatorModel: "llama3.2:3b"
   },
   medium: {
     label: "Средний CPU/GPU (8–16 GB)",
     labelEn: "Medium CPU/GPU (8–16 GB)",
-    models: ["mistral", "phi3"],
-    agentModel: "mistral",
-    aggregatorModel: "mistral"
+    models: ["llama3.2:3b", "qwen2.5:3b", "deepseek-r1:7b"],
+    agentModel: "llama3.2:3b",
+    aggregatorModel: "llama3.2:3b"
   },
   powerful: {
     label: "Мощный GPU (16+ GB VRAM)",
     labelEn: "Powerful GPU (16+ GB)",
-    models: ["mistral", "llama3.1", "phi3"],
-    agentModel: "mistral",
-    aggregatorModel: "llama3.1"
+    models: ["llama3.2:3b", "qwen2.5:3b", "deepseek-r1:7b"],
+    agentModel: "llama3.2:3b",
+    aggregatorModel: "llama3.2:3b"
   }
 } as const;
 
