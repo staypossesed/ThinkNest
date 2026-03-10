@@ -7,6 +7,7 @@ export interface AgentPromptConfig {
   model: string;
   numPredict?: number;
   temperature?: number;
+  topP?: number;
 }
 
 export interface PromptsConfig {
