@@ -20,6 +20,7 @@ async function nativeChat(
     model: string;
     messages: ChatMessage[];
     temperature?: number;
+    topP?: number;
     numPredict?: number;
     stream?: boolean;
     onToken?: (token: string) => void;
@@ -31,7 +32,8 @@ async function nativeChat(
     messages: options.messages,
     stream: options.stream ?? false,
     options: {
-      temperature: options.temperature ?? 0.4,
+      temperature: options.temperature ?? 0.3,
+      ...(options.topP != null && { top_p: options.topP }),
       ...(options.numPredict != null && { num_predict: options.numPredict })
     }
   };
@@ -92,6 +94,7 @@ export async function chatCompletion(options: {
   messages: ChatMessage[];
   timeoutMs: number;
   temperature?: number;
+  topP?: number;
   numPredict?: number;
   onToken?: (token: string) => void;
   externalSignal?: AbortSignal | null;
@@ -117,6 +120,7 @@ export async function chatCompletion(options: {
       model: options.model,
       messages: options.messages,
       temperature: options.temperature,
+      topP: options.topP,
       numPredict: options.numPredict,
       stream: !!options.onToken,
       onToken: options.onToken,
