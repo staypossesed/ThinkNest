@@ -14,33 +14,33 @@ export const MODE_MODELS: Record<
   }
 > = {
   fast: {
-    planner: "phi3",
-    critic: "phi3",
-    pragmatist: "phi3",
-    explainer: "phi3",
-    aggregator: "phi3",
-    imageFast: "phi3",
-    deepResearch: "mistral",
+    planner: "llama3.2:3b",
+    critic: "qwen2.5:3b",
+    pragmatist: "deepseek-r1:7b",
+    explainer: "llama3.2:3b",
+    aggregator: "llama3.2:3b",
+    imageFast: "phi4:mini",
+    deepResearch: "llama3.2:3b",
     vision: "llava"
   },
   balanced: {
-    planner: "mistral",
-    critic: "mistral",
-    pragmatist: "mistral",
-    explainer: "phi3",
-    aggregator: "mistral",
-    imageFast: "phi3",
-    deepResearch: "llama3.1",
+    planner: "llama3.2:3b",
+    critic: "qwen2.5:3b",
+    pragmatist: "deepseek-r1:7b",
+    explainer: "llama3.2:3b",
+    aggregator: "llama3.2:3b",
+    imageFast: "phi4:mini",
+    deepResearch: "llama3.2:3b",
     vision: "llava"
   },
   quality: {
-    planner: "llama3.1",
-    critic: "llama3.1",
-    pragmatist: "mistral",
-    explainer: "phi3",
-    aggregator: "llama3.1",
-    imageFast: "phi3",
-    deepResearch: "llama3.1",
+    planner: "llama3.2:3b",
+    critic: "qwen2.5:3b",
+    pragmatist: "deepseek-r1:7b",
+    explainer: "llama3.2:3b",
+    aggregator: "llama3.2:3b",
+    imageFast: "phi4:mini",
+    deepResearch: "llama3.2:3b",
     vision: "llava"
   }
 };
@@ -59,7 +59,7 @@ export const ollamaConfig = {
   agentConcurrency: Math.max(1, Number(process.env.OLLAMA_AGENT_CONCURRENCY ?? 2)),
   skipVisionIfOcr: (process.env.OLLAMA_SKIP_VISION_IF_OCR ?? "true") !== "false",
   llmLanguageRewrite: process.env.OLLAMA_LLM_LANGUAGE_REWRITE === "true",
-  deepResearchModel: process.env.OLLAMA_DEEP_RESEARCH_MODEL ?? "llama3.1",
+  deepResearchModel: process.env.OLLAMA_DEEP_RESEARCH_MODEL ?? "llama3.2:3b",
   deepResearchTimeoutMs: Number(process.env.OLLAMA_DEEP_RESEARCH_TIMEOUT_MS ?? 150000),
   sequentialAgents: process.env.SEQUENTIAL_AGENTS === "true",
   visionModel: process.env.OLLAMA_VISION_MODEL ?? "llava"

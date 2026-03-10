@@ -12,39 +12,39 @@ export const MODE_MODELS: Record<OllamaMode, {
   vision: string;
 }> = {
   fast: {
-    planner: "phi3",
-    critic: "phi3",
-    pragmatist: "phi3",
-    explainer: "phi3",
-    aggregator: "phi3",
-    imageFast: "phi3",
-    deepResearch: "mistral",
+    planner: "llama3.2:3b",
+    critic: "qwen2.5:3b",
+    pragmatist: "deepseek-r1:7b",
+    explainer: "llama3.2:3b",
+    aggregator: "llama3.2:3b",
+    imageFast: "phi4:mini",
+    deepResearch: "llama3.2:3b",
     vision: "llava"
   },
   balanced: {
-    planner: "mistral",
-    critic: "mistral",
-    pragmatist: "mistral",
-    explainer: "phi3",
-    aggregator: "mistral",
-    imageFast: "phi3",
-    deepResearch: "llama3.1",
+    planner: "llama3.2:3b",
+    critic: "qwen2.5:3b",
+    pragmatist: "deepseek-r1:7b",
+    explainer: "llama3.2:3b",
+    aggregator: "llama3.2:3b",
+    imageFast: "phi4:mini",
+    deepResearch: "llama3.2:3b",
     vision: "llava"
   },
   quality: {
-    planner: "llama3.1",
-    critic: "llama3.1",
-    pragmatist: "mistral",
-    explainer: "phi3",
-    aggregator: "llama3.1",
-    imageFast: "phi3",
-    deepResearch: "llama3.1",
+    planner: "llama3.2:3b",
+    critic: "qwen2.5:3b",
+    pragmatist: "deepseek-r1:7b",
+    explainer: "llama3.2:3b",
+    aggregator: "llama3.2:3b",
+    imageFast: "phi4:mini",
+    deepResearch: "llama3.2:3b",
     vision: "llava"
   }
 };
 
 /** Все модели, которые устанавливаются при онбординге — фиксированный набор */
-export const REQUIRED_MODELS = ["phi3", "mistral", "llama3.1", "llava"] as const;
+export const REQUIRED_MODELS = ["llama3.2:3b", "qwen2.5:3b", "deepseek-r1:7b", "llava"] as const;
 
 export function getModelsForMode(mode: OllamaMode = "balanced") {
   return MODE_MODELS[mode] ?? MODE_MODELS.balanced;
@@ -67,20 +67,20 @@ export const ollamaConfig = {
   /** Дорогой LLM-rewrite языка выключен по умолчанию для скорости. */
   llmLanguageRewrite: process.env.OLLAMA_LLM_LANGUAGE_REWRITE === "true",
   /** Профиль для Deep Research: сильнее модель, дольше таймаут. */
-  deepResearchModel: process.env.OLLAMA_DEEP_RESEARCH_MODEL ?? "llama3.1",
+  deepResearchModel: process.env.OLLAMA_DEEP_RESEARCH_MODEL ?? "llama3.2:3b",
   deepResearchTimeoutMs: Number(process.env.OLLAMA_DEEP_RESEARCH_TIMEOUT_MS ?? 150000),
   /** Параллельный запуск по умолчанию — быстрее (max вместо sum). SEQUENTIAL_AGENTS=true для последовательного. */
   sequentialAgents: process.env.SEQUENTIAL_AGENTS === "true",
   /** Смешанный профиль по умолчанию: баланс качества и скорости. */
   agents: {
-    planner: process.env.OLLAMA_PLANNER_MODEL ?? "mistral",
-    critic: process.env.OLLAMA_CRITIC_MODEL ?? "llama3.1",
-    pragmatist: process.env.OLLAMA_PRAGMATIST_MODEL ?? "mistral",
-    explainer: process.env.OLLAMA_EXPLAINER_MODEL ?? "phi3"
+    planner: process.env.OLLAMA_PLANNER_MODEL ?? "llama3.2:3b",
+    critic: process.env.OLLAMA_CRITIC_MODEL ?? "qwen2.5:3b",
+    pragmatist: process.env.OLLAMA_PRAGMATIST_MODEL ?? "deepseek-r1:7b",
+    explainer: process.env.OLLAMA_EXPLAINER_MODEL ?? "llama3.2:3b"
   },
-  aggregatorModel: process.env.OLLAMA_AGGREGATOR_MODEL ?? "llama3.1",
+  aggregatorModel: process.env.OLLAMA_AGGREGATOR_MODEL ?? "llama3.2:3b",
   /** Быстрый профиль для image-only/vision сценариев. */
-  imageFastModel: process.env.OLLAMA_IMAGE_FAST_MODEL ?? "phi3",
+  imageFastModel: process.env.OLLAMA_IMAGE_FAST_MODEL ?? "phi4:mini",
   /** Vision model для распознавания картинок (llava, llava:7b и т.п.) */
   visionModel: process.env.OLLAMA_VISION_MODEL ?? "llava"
 };
