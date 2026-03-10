@@ -1,4 +1,16 @@
 import { useRef } from "react";
+import {
+  Globe,
+  TrendingUp,
+  Search,
+  Image as ImageIcon,
+  Brain,
+  User,
+  Mic,
+  Send,
+  Square,
+  X
+} from "lucide-react";
 import type { UiLocale } from "./LanguageSelector";
 import { t } from "../i18n";
 import { useSTT, sttLangCode } from "../hooks/useSpeech";
@@ -29,7 +41,6 @@ interface MessageInputProps {
   onOpenMemory?: () => void;
   expertProfile?: string;
   onExpertProfileChange?: (id: string) => void;
-  /** Pro-only feature flags (default true for backward compat) */
   canUseWebData?: boolean;
   canUseForecast?: boolean;
   canUseExpertProfile?: boolean;
@@ -64,7 +75,6 @@ export default function MessageInput(props: MessageInputProps) {
     onUseWebDataChange,
     onForecastModeChange,
     onDeepResearchModeChange,
-    statusText,
     error,
     placeholder = "",
     images = [],
@@ -116,15 +126,15 @@ export default function MessageInput(props: MessageInputProps) {
 
   const expertLabel = (id: string) => {
     const labels: Record<string, Record<string, string>> = {
-      "": { ru: "👤 Роль", en: "👤 Role", zh: "👤 角色" },
-      lawyer: { ru: "⚖️ Юрист", en: "⚖️ Lawyer", zh: "⚖️ 律师" },
-      doctor: { ru: "🏥 Врач", en: "🏥 Doctor", zh: "🏥 医生" },
-      investor: { ru: "📈 Инвестор", en: "📈 Investor", zh: "📈 投资者" },
-      developer: { ru: "💻 Dev", en: "💻 Dev", zh: "💻 开发" },
-      teacher: { ru: "📚 Учитель", en: "📚 Teacher", zh: "📚 教师" },
-      marketer: { ru: "📣 Маркетолог", en: "📣 Marketer", zh: "📣 营销" }
+      "": { ru: "Роль", en: "Role", zh: "角色" },
+      lawyer: { ru: "Юрист", en: "Lawyer", zh: "律师" },
+      doctor: { ru: "Врач", en: "Doctor", zh: "医生" },
+      investor: { ru: "Инвестор", en: "Investor", zh: "投资者" },
+      developer: { ru: "Dev", en: "Dev", zh: "开发" },
+      teacher: { ru: "Учитель", en: "Teacher", zh: "教师" },
+      marketer: { ru: "Маркетолог", en: "Marketer", zh: "营销" }
     };
-    return labels[id]?.[uiLocale] ?? labels[id]?.en ?? "👤 Role";
+    return labels[id]?.[uiLocale] ?? labels[id]?.en ?? "Role";
   };
 
   const nextExpert = () => {
@@ -133,11 +143,25 @@ export default function MessageInput(props: MessageInputProps) {
     onExpertProfileChange?.(order[(cur + 1) % order.length]);
   };
 
+  const placeholderText = listening
+    ? uiLocale === "ru"
+      ? "Говорите... (нажмите 🎤 для остановки)"
+      : uiLocale === "zh"
+        ? "说话... (点击 🎤 停止)"
+        : "Speak... (click 🎤 to stop)"
+    : placeholder;
+
   return (
-    <div className="message-input">
-      <div className="message-input-chips">
+    <div className="mx-auto max-w-3xl px-4 pb-6">
+      <div className="flex flex-wrap gap-2 pb-3">
         <label
-          className={`chip ${!canUseWebData ? "chip--locked" : ""}`}
+          className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium backdrop-blur-xl transition-all duration-200 ${
+            !canUseWebData
+              ? "cursor-not-allowed border-white/10 bg-white/5 opacity-50"
+              : useWebData
+                ? "border-purple-500/50 bg-purple-500/20 text-purple-300"
+                : "border-white/15 bg-white/[0.07] text-gray-400 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
+          }`}
           title={!canUseWebData ? t(uiLocale, "featureProOnly") : undefined}
         >
           <input
@@ -145,11 +169,19 @@ export default function MessageInput(props: MessageInputProps) {
             checked={useWebData}
             onChange={(e) => onUseWebDataChange(e.target.checked)}
             disabled={loading || !canUseWebData}
+            className="sr-only"
           />
-          <span>{t(uiLocale, "useWebData")}</span>
+          <Globe className="h-4 w-4" />
+          {t(uiLocale, "useWebData")}
         </label>
         <label
-          className={`chip ${!canUseForecast ? "chip--locked" : ""}`}
+          className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium backdrop-blur-xl transition-all duration-200 ${
+            !canUseForecast
+              ? "cursor-not-allowed border-white/10 bg-white/5 opacity-50"
+              : forecastMode
+                ? "border-purple-500/50 bg-purple-500/20 text-purple-300"
+                : "border-white/15 bg-white/[0.07] text-gray-400 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
+          }`}
           title={!canUseForecast ? t(uiLocale, "featureProOnly") : undefined}
         >
           <input
@@ -157,67 +189,87 @@ export default function MessageInput(props: MessageInputProps) {
             checked={forecastMode}
             onChange={(e) => onForecastModeChange(e.target.checked)}
             disabled={loading || !canUseForecast}
+            className="sr-only"
           />
-          <span>{t(uiLocale, "forecast")}</span>
+          <TrendingUp className="h-4 w-4" />
+          {t(uiLocale, "forecast")}
         </label>
-        <label className="chip">
+        <label
+          className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium backdrop-blur-xl transition-all duration-200 ${
+            deepResearchMode
+              ? "border-purple-500/50 bg-purple-500/20 text-purple-300"
+              : "border-white/15 bg-white/[0.07] text-gray-400 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
+          }`}
+        >
           <input
             type="checkbox"
             checked={deepResearchMode}
             onChange={(e) => onDeepResearchModeChange(e.target.checked)}
             disabled={loading}
+            className="sr-only"
           />
-          <span>{t(uiLocale, "deepResearch")}</span>
+          <Search className="h-4 w-4" />
+          {t(uiLocale, "deepResearch")}
         </label>
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
           multiple
-          className="message-input-file-hidden"
+          className="absolute h-0 w-0 opacity-0"
           onChange={handleFileChange}
           disabled={loading || disabled || images.length >= MAX_IMAGES}
         />
         <button
           type="button"
-          className="chip message-input-attach"
           onClick={() => fileInputRef.current?.click()}
           disabled={loading || disabled || images.length >= MAX_IMAGES}
+          className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3.5 py-1.5 text-sm font-medium text-gray-400 backdrop-blur-xl transition-all duration-200 hover:border-white/25 hover:bg-white/12 hover:text-gray-300 disabled:opacity-50"
           title={t(uiLocale, "attachImage")}
         >
-          📷 {t(uiLocale, "image")}
+          <ImageIcon className="h-4 w-4" />
+          {t(uiLocale, "image")}
         </button>
-        {/* Memory button */}
         {onOpenMemory && canUseMemory && (
-          <button type="button" className="chip" onClick={onOpenMemory} title={uiLocale === "ru" ? "Личная память" : "Memory"}>
-            🧠
+          <button
+            type="button"
+            onClick={onOpenMemory}
+            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3.5 py-1.5 text-sm font-medium text-gray-400 backdrop-blur-xl transition-all duration-200 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
+            title={uiLocale === "ru" ? "Личная память" : "Memory"}
+          >
+            <Brain className="h-4 w-4" />
           </button>
         )}
-        {/* Expert profile cycle button */}
         {onExpertProfileChange && (
           <button
             type="button"
-            className={`chip ${expertProfile ? "chip--active" : ""} ${!canUseExpertProfile ? "chip--locked" : ""}`}
             onClick={canUseExpertProfile ? nextExpert : undefined}
             disabled={loading || !canUseExpertProfile}
-            title={!canUseExpertProfile ? t(uiLocale, "featureProOnly") : uiLocale === "ru" ? "Эксперт" : uiLocale === "zh" ? "专家" : "Expert"}
+            className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium backdrop-blur-xl transition-all duration-200 ${
+              !canUseExpertProfile
+                ? "cursor-not-allowed border-white/10 bg-white/5 opacity-50 text-gray-400"
+                : expertProfile
+                  ? "border-purple-500/50 bg-purple-500/20 text-purple-300"
+                  : "border-white/15 bg-white/[0.07] text-gray-400 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
+            }`}
+            title={!canUseExpertProfile ? t(uiLocale, "featureProOnly") : "Expert"}
           >
+            <User className="h-4 w-4" />
             {expertLabel(expertProfile)}
           </button>
         )}
-        {/* Voice input button */}
         <button
           type="button"
-          className={`chip ${listening ? "chip--recording" : ""}`}
           onClick={handleVoice}
           disabled={loading || disabled || sttLoading}
+          className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium backdrop-blur-xl transition-all duration-200 ${
+            listening
+              ? "border-red-500/50 bg-red-500/20 text-red-400 animate-pulse"
+              : "border-white/15 bg-white/[0.07] text-gray-400 hover:border-white/25 hover:bg-white/12 hover:text-gray-300 disabled:opacity-50"
+          }`}
           title={
             sttLoading
-              ? uiLocale === "ru"
-                ? "Загрузка модели..."
-                : uiLocale === "zh"
-                  ? "加载模型中..."
-                  : "Loading model..."
+              ? "Loading..."
               : uiLocale === "ru"
                 ? "Голосовой ввод"
                 : uiLocale === "zh"
@@ -225,25 +277,44 @@ export default function MessageInput(props: MessageInputProps) {
                   : "Voice input"
           }
         >
-          {sttLoading ? "⏳" : listening ? "🔴" : "🎤"}
+          {sttLoading ? (
+            <span className="h-4 w-4 animate-spin">⏳</span>
+          ) : (
+            <Mic className="h-4 w-4" />
+          )}
         </button>
       </div>
+
       {images.length > 0 && (
-        <div className="message-input-previews">
+        <div className="mb-3 flex flex-wrap gap-2">
           {images.map((uri, i) => (
-            <div key={i} className="message-input-preview">
-              <img src={uri} alt="" />
-              <button type="button" onClick={() => removeImage(i)} aria-label={t(uiLocale, "delete")}>
-                ×
+            <div key={i} className="relative">
+              <img
+                src={uri}
+                alt=""
+                className="h-16 w-16 rounded-lg object-cover ring-1 ring-white/10"
+              />
+              <button
+                type="button"
+                onClick={() => removeImage(i)}
+                className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500/90 text-white transition-colors hover:bg-red-500"
+                aria-label={t(uiLocale, "delete")}
+              >
+                <X className="h-3 w-3" />
               </button>
             </div>
           ))}
         </div>
       )}
+
       {loadingInOtherChat && (
-        <p className="message-input-loading-other">{t(uiLocale, "loadingInOtherChat")}</p>
+        <p className="mb-2 text-sm text-amber-400">{t(uiLocale, "loadingInOtherChat")}</p>
       )}
-      <div className="message-input-row">
+
+      <div
+        className="flex gap-3 rounded-2xl border border-white/15 bg-white/[0.08] p-2.5 backdrop-blur-2xl"
+        style={{ boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.06)" }}
+      >
         <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -256,44 +327,39 @@ export default function MessageInput(props: MessageInputProps) {
               onStop?.();
             }
           }}
-          placeholder={
-            listening
-              ? uiLocale === "ru"
-                ? "Говорите... (нажмите 🎤 для остановки)"
-                : uiLocale === "zh"
-                  ? "说话... (点击 🎤 停止)"
-                  : "Speak... (click 🎤 to stop)"
-              : placeholder
-          }
+          placeholder={placeholderText}
           rows={1}
           disabled={disabled || loading}
+          className="min-h-[44px] flex-1 resize-none rounded-xl border-0 bg-transparent px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-0"
         />
         {loading ? (
           <button
             type="button"
             onClick={onStop}
-            className="message-input-stop"
-            title={uiLocale === "ru" ? "Остановить (Esc)" : uiLocale === "zh" ? "停止 (Esc)" : "Stop (Esc)"}
+            className="flex shrink-0 items-center gap-2 rounded-xl bg-red-500/30 px-4 py-2.5 text-sm font-semibold text-red-400 shadow-lg shadow-red-500/20 transition-all hover:bg-red-500/40"
+            title="Stop (Esc)"
           >
-            ⏹ {uiLocale === "ru" ? "Стоп" : uiLocale === "zh" ? "停止" : "Stop"}
+            <Square className="h-4 w-4" />
+            {uiLocale === "ru" ? "Стоп" : uiLocale === "zh" ? "停止" : "Stop"}
           </button>
         ) : (
           <button
             type="button"
             onClick={onSubmit}
             disabled={disabled || !canSubmit}
-            className="message-input-submit"
+            className="flex shrink-0 items-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-purple-500 disabled:opacity-50 disabled:hover:bg-purple-600"
           >
+            <Send className="h-4 w-4" />
             {t(uiLocale, "submit")}
           </button>
         )}
       </div>
+
       {(error || sttError) && (
-        <div className="message-input-error">{error || sttError}</div>
+        <div className="mt-2 text-sm text-red-400">{error || sttError}</div>
       )}
-      <p className="message-input-hint">
-        {t(uiLocale, "legalHint")}
-      </p>
+
+      <p className="mt-2 text-xs text-gray-500">{t(uiLocale, "legalHint")}</p>
     </div>
   );
 }
