@@ -4,6 +4,8 @@
   "description": "",
   "main": "dist/main/index.js",
   "scripts": {
+    "server": "node server/index.js",
+    "server:dev": "node server/index.js",
     "dev:backend": "npm --prefix backend run dev",
     "dev:web": "concurrently -k \"npm run dev:backend\" \"npm run dev:renderer\"",
     "dev:renderer": "vite --config vite.config.ts",
@@ -26,8 +28,10 @@
   "type": "commonjs",
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",
+    "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "duck-duck-scrape": "^2.2.7",
+    "express": "^4.22.1",
     "lucide-react": "^0.577.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
