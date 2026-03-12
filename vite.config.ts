@@ -61,6 +61,7 @@ export default defineConfig(({ command }) => ({
     exclude: ["@huggingface/transformers"],
     include: ["react", "react-dom", "react-markdown", "remark-gfm"]
   },
+  base: "./",
   build: {
     outDir: path.resolve(__dirname, "dist/renderer"),
     emptyOutDir: true

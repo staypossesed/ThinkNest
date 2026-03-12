@@ -8,6 +8,7 @@ import type {
   SessionState
 } from "../shared/types";
 import ChatSidebar from "./components/ChatSidebar";
+import Logo from "./components/Logo";
 import ChatMain from "./components/ChatMain";
 import MessageInput from "./components/MessageInput";
 import LanguageSelector, { type UiLocale } from "./components/LanguageSelector";
@@ -386,6 +387,7 @@ export default function App() {
       />
     )}
     <div className="flex h-full min-h-screen bg-[#050505]">
+      {(!sidebarCollapsed || sidebarOpen) && (
       <ChatSidebar
         conversations={conversations}
         activeId={activeId}
@@ -417,23 +419,32 @@ export default function App() {
           });
         }}
       />
+      )}
       <main className="flex flex-1 flex-col min-w-0 overflow-hidden">
         <div className="flex shrink-0 items-center justify-between gap-4 border-b border-white/10 bg-[#050505] px-5 py-3">
-          <button
-            type="button"
-            className={`flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-gray-400 transition-colors hover:bg-white/10 hover:text-white ${!sidebarCollapsed ? "md:hidden" : ""}`}
-            onClick={() => {
-              if (sidebarCollapsed) {
+          {sidebarCollapsed ? (
+            <button
+              type="button"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 transition-colors hover:bg-white/10"
+              onClick={() => {
                 setSidebarCollapsed(false);
                 try { localStorage.setItem("thinknest_sidebar_collapsed", "0"); } catch {}
-              } else {
-                setSidebarOpen(true);
-              }
-            }}
-            aria-label={sidebarCollapsed ? "Expand sidebar" : "Menu"}
-          >
-            ☰
-          </button>
+              }}
+              aria-label={uiLocale === "ru" ? "Показать чаты" : "Show chats"}
+              title={uiLocale === "ru" ? "Показать чаты" : "Show chats"}
+            >
+              <Logo className="h-9 w-9 shrink-0" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-gray-400 transition-colors hover:bg-white/10 hover:text-white md:hidden"
+              onClick={() => setSidebarOpen(true)}
+              aria-label={uiLocale === "ru" ? "Меню" : "Menu"}
+            >
+              ☰
+            </button>
+          )}
           <div className="flex-1" />
           <LanguageSelector value={uiLocale} onChange={handleLocaleChange} />
         </div>
@@ -444,7 +455,7 @@ export default function App() {
           uiLocale={uiLocale}
           streamingTokens={isLoadingInCurrentChat ? streamingTokens : {}}
         />
-        <div className="shrink-0 border-t border-white/10">
+        <div className="shrink-0 border-t border-white/10 bg-[#050505]/80 backdrop-blur-sm">
           <MessageInput
             value={question}
             onChange={setQuestion}

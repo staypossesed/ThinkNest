@@ -93,7 +93,7 @@ export default function FinalAnswer({ final, webSources, uiLocale, question = ""
 
       {expanded && (
         <div className="mt-5 border-t border-white/10 pt-5">
-          <div className="text-base leading-relaxed text-gray-300 [&_p]:mb-3 [&_p:last-child]:mb-0 [&_ul]:my-3 [&_ol]:my-3 [&_code]:rounded [&_code]:bg-white/10 [&_code]:px-1.5 [&_pre]:overflow-x-auto [&_a]:text-purple-400 [&_a]:underline">
+          <div className="scrollbar-chat max-h-[420px] overflow-y-auto text-base leading-relaxed text-gray-300 [&_p]:mb-3 [&_p:last-child]:mb-0 [&_ul]:my-3 [&_ol]:my-3 [&_code]:rounded [&_code]:bg-white/10 [&_code]:px-1.5 [&_pre]:overflow-x-auto [&_a]:text-purple-400 [&_a]:underline">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{final.content}</ReactMarkdown>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Settings } from "lucide-react";
-import logo from "../assets/logo.svg";
+import Logo from "./Logo";
 import type { Conversation, SessionState, Entitlements } from "../../shared/types";
 import type { UiLocale } from "./LanguageSelector";
 import { t } from "../i18n";
@@ -132,18 +132,18 @@ export default function ChatSidebar({
         collapsed ? "w-0 min-w-0 overflow-hidden border-r-0" : ""
       } ${mobileOpen ? "fixed inset-y-0 left-0 z-50" : ""}`}
     >
-      {(onMobileClose || onCollapseToggle) && (
+      {(mobileOpen && onMobileClose) || onCollapseToggle ? (
         <button
           type="button"
           className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
-          onClick={() => (isMobile ? onMobileClose?.() : onCollapseToggle?.())}
-          aria-label={isMobile ? (uiLocale === "ru" ? "Закрыть" : "Close") : (uiLocale === "ru" ? "Свернуть меню" : "Collapse sidebar")}
+          onClick={() => (isMobile && mobileOpen ? onMobileClose?.() : onCollapseToggle?.())}
+          aria-label={isMobile && mobileOpen ? (uiLocale === "ru" ? "Закрыть" : "Close") : (uiLocale === "ru" ? "Свернуть чаты" : "Collapse chats")}
         >
           ×
         </button>
-      )}
+      ) : null}
       <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5">
-        <img src={logo} alt="" className="h-9 w-9 object-contain" />
+        <Logo className="h-9 w-9" />
         <span className="text-lg font-bold tracking-tight text-white">ThinkNest</span>
       </div>
       <button
@@ -153,7 +153,7 @@ export default function ChatSidebar({
       >
         {t(uiLocale, "newChatBtn")}
       </button>
-      <div className="flex-1 overflow-y-auto py-2">
+      <div className="scrollbar-chat flex-1 overflow-y-auto py-2">
         {conversations.map((c) => (
           <div
             key={c.id}

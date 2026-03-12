@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import {
   Globe,
   TrendingUp,
@@ -91,7 +91,21 @@ export default function MessageInput(props: MessageInputProps) {
 
   const canSubmit = value.trim() || images.length > 0;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { start: startSTT, stop: stopSTT, listening, loading: sttLoading, error: sttError } = useSTT();
+
+  // Auto-resize textarea; collapse to small when value is empty (e.g. after submit)
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    if (!value.trim()) {
+      el.style.height = "auto";
+      el.style.height = "44px";
+      return;
+    }
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, [value]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -152,14 +166,14 @@ export default function MessageInput(props: MessageInputProps) {
     : placeholder;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 pb-6">
-      <div className="flex flex-wrap gap-2 pb-3">
+    <div className="mx-auto max-w-3xl px-4 pb-8 pt-2">
+      <div className="flex flex-nowrap items-center gap-2 mb-4 overflow-x-auto scrollbar-chat">
         <label
-          className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium backdrop-blur-xl transition-all duration-200 ${
+          className={`input-chip cursor-pointer border backdrop-blur-xl transition-colors duration-200 ${
             !canUseWebData
               ? "cursor-not-allowed border-white/10 bg-white/5 opacity-50"
               : useWebData
-                ? "border-purple-500/50 bg-purple-500/20 text-purple-300"
+                ? "border-purple-500/40 bg-purple-500/15 text-purple-300"
                 : "border-white/15 bg-white/[0.07] text-gray-400 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
           }`}
           title={!canUseWebData ? t(uiLocale, "featureProOnly") : undefined}
@@ -171,15 +185,15 @@ export default function MessageInput(props: MessageInputProps) {
             disabled={loading || !canUseWebData}
             className="sr-only"
           />
-          <Globe className="h-4 w-4" />
+          <Globe className="h-3.5 w-3.5 shrink-0" />
           {t(uiLocale, "useWebData")}
         </label>
         <label
-          className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium backdrop-blur-xl transition-all duration-200 ${
+          className={`input-chip cursor-pointer border backdrop-blur-xl transition-colors duration-200 ${
             !canUseForecast
               ? "cursor-not-allowed border-white/10 bg-white/5 opacity-50"
               : forecastMode
-                ? "border-purple-500/50 bg-purple-500/20 text-purple-300"
+                ? "border-purple-500/40 bg-purple-500/15 text-purple-300"
                 : "border-white/15 bg-white/[0.07] text-gray-400 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
           }`}
           title={!canUseForecast ? t(uiLocale, "featureProOnly") : undefined}
@@ -191,13 +205,13 @@ export default function MessageInput(props: MessageInputProps) {
             disabled={loading || !canUseForecast}
             className="sr-only"
           />
-          <TrendingUp className="h-4 w-4" />
+          <TrendingUp className="h-3.5 w-3.5 shrink-0" />
           {t(uiLocale, "forecast")}
         </label>
         <label
-          className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium backdrop-blur-xl transition-all duration-200 ${
+          className={`input-chip cursor-pointer border backdrop-blur-xl transition-colors duration-200 ${
             deepResearchMode
-              ? "border-purple-500/50 bg-purple-500/20 text-purple-300"
+              ? "border-purple-500/40 bg-purple-500/15 text-purple-300"
               : "border-white/15 bg-white/[0.07] text-gray-400 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
           }`}
         >
@@ -208,7 +222,7 @@ export default function MessageInput(props: MessageInputProps) {
             disabled={loading}
             className="sr-only"
           />
-          <Search className="h-4 w-4" />
+          <Search className="h-3.5 w-3.5 shrink-0" />
           {t(uiLocale, "deepResearch")}
         </label>
         <input
@@ -224,20 +238,20 @@ export default function MessageInput(props: MessageInputProps) {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={loading || disabled || images.length >= MAX_IMAGES}
-          className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3.5 py-1.5 text-sm font-medium text-gray-400 backdrop-blur-xl transition-all duration-200 hover:border-white/25 hover:bg-white/12 hover:text-gray-300 disabled:opacity-50"
+          className="input-chip border border-white/15 bg-white/[0.07] text-gray-400 backdrop-blur-xl transition-colors duration-200 hover:border-white/25 hover:bg-white/12 hover:text-gray-300 disabled:opacity-50"
           title={t(uiLocale, "attachImage")}
         >
-          <ImageIcon className="h-4 w-4" />
+          <ImageIcon className="h-3.5 w-3.5 shrink-0" />
           {t(uiLocale, "image")}
         </button>
         {onOpenMemory && canUseMemory && (
           <button
             type="button"
             onClick={onOpenMemory}
-            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3.5 py-1.5 text-sm font-medium text-gray-400 backdrop-blur-xl transition-all duration-200 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
+            className="input-chip border border-white/15 bg-white/[0.07] text-gray-400 backdrop-blur-xl transition-colors duration-200 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
             title={uiLocale === "ru" ? "Личная память" : "Memory"}
           >
-            <Brain className="h-4 w-4" />
+            <Brain className="h-3.5 w-3.5 shrink-0" />
           </button>
         )}
         {onExpertProfileChange && (
@@ -245,16 +259,16 @@ export default function MessageInput(props: MessageInputProps) {
             type="button"
             onClick={canUseExpertProfile ? nextExpert : undefined}
             disabled={loading || !canUseExpertProfile}
-            className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium backdrop-blur-xl transition-all duration-200 ${
+            className={`input-chip cursor-pointer border backdrop-blur-xl transition-colors duration-200 ${
               !canUseExpertProfile
                 ? "cursor-not-allowed border-white/10 bg-white/5 opacity-50 text-gray-400"
                 : expertProfile
-                  ? "border-purple-500/50 bg-purple-500/20 text-purple-300"
+                  ? "border-purple-500/40 bg-purple-500/15 text-purple-300"
                   : "border-white/15 bg-white/[0.07] text-gray-400 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
             }`}
             title={!canUseExpertProfile ? t(uiLocale, "featureProOnly") : "Expert"}
           >
-            <User className="h-4 w-4" />
+            <User className="h-3.5 w-3.5 shrink-0" />
             {expertLabel(expertProfile)}
           </button>
         )}
@@ -262,9 +276,9 @@ export default function MessageInput(props: MessageInputProps) {
           type="button"
           onClick={handleVoice}
           disabled={loading || disabled || sttLoading}
-          className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium backdrop-blur-xl transition-all duration-200 ${
+          className={`input-chip cursor-pointer border backdrop-blur-xl transition-colors duration-200 ${
             listening
-              ? "border-red-500/50 bg-red-500/20 text-red-400 animate-pulse"
+              ? "border-red-500/40 bg-red-500/15 text-red-400 animate-pulse"
               : "border-white/15 bg-white/[0.07] text-gray-400 hover:border-white/25 hover:bg-white/12 hover:text-gray-300 disabled:opacity-50"
           }`}
           title={
@@ -278,9 +292,9 @@ export default function MessageInput(props: MessageInputProps) {
           }
         >
           {sttLoading ? (
-            <span className="h-4 w-4 animate-spin">⏳</span>
+            <span className="h-3.5 w-3.5 shrink-0 animate-spin">⏳</span>
           ) : (
-            <Mic className="h-4 w-4" />
+            <Mic className="h-3.5 w-3.5 shrink-0" />
           )}
         </button>
       </div>
@@ -316,6 +330,7 @@ export default function MessageInput(props: MessageInputProps) {
         style={{ boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.06)" }}
       >
         <textarea
+          ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => {
@@ -330,7 +345,7 @@ export default function MessageInput(props: MessageInputProps) {
           placeholder={placeholderText}
           rows={1}
           disabled={disabled || loading}
-          className="min-h-[44px] flex-1 resize-none rounded-xl border-0 bg-transparent px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-0"
+          className="input-textarea min-h-[44px] max-h-[200px] flex-1 resize-none overflow-y-auto rounded-xl border-0 bg-transparent px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-0"
         />
         {loading ? (
           <button
@@ -359,7 +374,9 @@ export default function MessageInput(props: MessageInputProps) {
         <div className="mt-2 text-sm text-red-400">{error || sttError}</div>
       )}
 
-      <p className="mt-2 text-xs text-gray-500">{t(uiLocale, "legalHint")}</p>
+      <p className="mt-4 text-[11px] leading-relaxed text-gray-500/80">
+        {t(uiLocale, "legalHint")}
+      </p>
     </div>
   );
 }

@@ -112,7 +112,7 @@ export default function AgentCard({ answer, uiLocale, streamingContent, isStream
 
       {(expanded || isStreaming) && (
         <div className="mt-4 border-t border-white/10 pt-4">
-          <div className="text-sm leading-relaxed text-gray-300 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:my-2 [&_ol]:my-2 [&_code]:rounded [&_code]:bg-white/10 [&_code]:px-1 [&_pre]:overflow-x-auto [&_a]:text-purple-400 [&_a]:underline">
+          <div className="scrollbar-chat max-h-[280px] overflow-y-auto text-sm leading-relaxed text-gray-300 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:my-2 [&_ol]:my-2 [&_code]:rounded [&_code]:bg-white/10 [&_code]:px-1 [&_pre]:overflow-x-auto [&_a]:text-purple-400 [&_a]:underline">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayContent}</ReactMarkdown>
           </div>
           {isStreaming && (

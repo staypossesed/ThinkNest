@@ -54,7 +54,7 @@ export default function ChatMain({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-6 py-8">
+    <div className="scrollbar-chat flex-1 overflow-y-auto px-6 py-8">
       <div className="mx-auto flex max-w-3xl flex-col gap-8">
         {messages.map((msg) => (
           <div key={msg.id} className="flex flex-col gap-4">

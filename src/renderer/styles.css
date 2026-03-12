@@ -60,6 +60,76 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Scrollbar — 5% visible by default, full when hovering; thick; no arrows */
+.scrollbar-chat {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.05) transparent;
+}
+.scrollbar-chat::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+.scrollbar-chat::-webkit-scrollbar-button {
+  display: none;
+}
+.scrollbar-chat::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-chat::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.15s ease;
+}
+.scrollbar-chat::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.7);
+  background-clip: padding-box;
+}
+.scrollbar-chat::-webkit-scrollbar-thumb:active {
+  background: rgba(255, 255, 255, 0.85);
+  background-clip: padding-box;
+}
+.scrollbar-chat::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Textarea — no visible scrollbar for clean input look */
+.input-textarea {
+  scrollbar-width: none;
+}
+.input-textarea::-webkit-scrollbar {
+  display: none;
+}
+
+/* Input chips — fixed size 100x32, same form/color, one row, no wrap */
+.input-chip {
+  width: 112px !important;
+  min-width: 112px !important;
+  max-width: 112px !important;
+  height: 32px !important;
+  padding: 0 8px !important;
+  flex-shrink: 0;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px !important;
+  font-weight: 500;
+  border-radius: 9999px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transform-origin: center;
+  transition: transform 0.12s ease-out, background-color 0.15s ease, border-color 0.15s ease;
+}
+.input-chip:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+.input-chip:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
 .app {
   max-width: 1280px;
   margin: 0 auto;
@@ -1296,20 +1366,28 @@ button:disabled {
   overflow-x: hidden;
   font-size: 0.9rem;
   line-height: 1.6;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.05) transparent;
 }
-
 .grid .card .content::-webkit-scrollbar {
-  width: 6px;
+  width: 14px;
 }
-
+.grid .card .content::-webkit-scrollbar-button {
+  display: none;
+}
 .grid .card .content::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
+  background: transparent;
 }
-
 .grid .card .content::-webkit-scrollbar-thumb {
-  background: var(--text-muted);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.15s ease;
+}
+.grid .card .content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.7);
+  background-clip: padding-box;
 }
 
 .meta {
@@ -1743,20 +1821,28 @@ button:disabled {
 .final .content {
   max-height: 420px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.05) transparent;
 }
-
 .final .content::-webkit-scrollbar {
-  width: 6px;
+  width: 14px;
 }
-
+.final .content::-webkit-scrollbar-button {
+  display: none;
+}
 .final .content::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
+  background: transparent;
 }
-
 .final .content::-webkit-scrollbar-thumb {
-  background: var(--text-muted);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.15s ease;
+}
+.final .content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.7);
+  background-clip: padding-box;
 }
 
 /* Mobile / PWA */
