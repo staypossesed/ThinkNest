@@ -126,6 +126,7 @@ PORT=3000
 | Файл | Описание |
 |------|----------|
 | [README_FIRST.md](./README_FIRST.md) | Быстрый старт |
+| [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) | Деплой на Ubuntu — от клона до работающей ссылки |
 | [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md) | Web-режим, ngrok |
 | [STRIPE_SETUP.md](./STRIPE_SETUP.md) | Stripe, подписки |
 | [PUBLISHING.md](./PUBLISHING.md) | Публикация репо |
