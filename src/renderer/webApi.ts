@@ -37,7 +37,21 @@ const DEMO_ENTITLEMENTS: Entitlements = {
   allowMemory: false
 };
 
+function isProductionHost(): boolean {
+  const h = typeof window !== "undefined" ? window.location.hostname : "";
+  return h !== "localhost" && h !== "127.0.0.1";
+}
+
 function getDemoAnswers(): AgentAnswer[] {
+  const prod = isProductionHost();
+  if (prod) {
+    return [
+      { id: "planner", title: "Планировщик", content: "📋 Сервис временно недоступен.", model: "demo", durationMs: 0 },
+      { id: "critic", title: "Критик", content: "🔍 Попробуйте позже или войдите через Google.", model: "demo", durationMs: 0 },
+      { id: "pragmatist", title: "Практик", content: "⚡ Войдите через Google, чтобы задавать вопросы.", model: "demo", durationMs: 0 },
+      { id: "explainer", title: "Объяснитель", content: "📖 Или установите десктопное приложение.", model: "demo", durationMs: 0 }
+    ];
+  }
   return [
     { id: "planner", title: "Планировщик", content: "📋 Запустите: npm run dev:backend и npm run dev:renderer. Перезагрузите страницу.", model: "demo", durationMs: 0 },
     { id: "critic", title: "Критик", content: "🔍 Откройте http://localhost:5173 в браузере (не Electron).", model: "demo", durationMs: 0 },
@@ -95,7 +109,9 @@ export function createWebApi() {
       return {
         answers: demoAnswers,
         final: {
-          content: "Backend недоступен. Запустите backend и frontend, перезагрузите страницу.",
+          content: isProductionHost()
+            ? "Сервис временно недоступен. Попробуйте позже."
+            : "Backend недоступен. Запустите backend и frontend, перезагрузите страницу.",
           model: "demo",
           durationMs: 0
         },
@@ -168,7 +184,7 @@ export function createWebApi() {
       window.open(url, "_blank");
     },
     async isDevMode(): Promise<boolean> {
-      return true;
+      return false;
     },
     async setAskLocale(_locale: string): Promise<void> {},
     async stopAsk(): Promise<void> {},

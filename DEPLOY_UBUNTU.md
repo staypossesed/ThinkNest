@@ -301,6 +301,27 @@ pm2 restart thinknest-backend
 
 ---
 
+## Если показывается «Войдите через Google» вместо ответов
+
+Это значит: backend доступен, но пользователь не авторизован. Проверь:
+
+1. **backend/.env** — для production (85.239.54.249):
+   ```env
+   APP_ORIGIN=http://85.239.54.249
+   GOOGLE_REDIRECT_URI=http://85.239.54.249/auth/google/callback
+   ```
+   (или `https://` если настроен SSL)
+
+2. **Google Cloud Console** → Credentials → OAuth 2.0 Client:
+   - Authorized JavaScript origins: `http://85.239.54.249`
+   - Authorized redirect URIs: `http://85.239.54.249/auth/google/callback`
+
+3. Перезапусти backend: `pm2 restart thinknest-backend`
+
+4. Нажми «Войти через Google» на сайте и пройди авторизацию.
+
+---
+
 ## Краткая шпаргалка команд
 
 | Действие | Команда |
