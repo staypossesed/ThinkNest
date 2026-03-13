@@ -51,7 +51,11 @@ app.decorate(
 );
 
 app.get("/health", async () => {
-  return { ok: true, service: "multi-agent-backend" };
+  return {
+    ok: true,
+    service: "multi-agent-backend",
+    redirect_uri: config.GOOGLE_REDIRECT_URI
+  };
 });
 
 async function bootstrap(): Promise<void> {
@@ -64,6 +68,7 @@ async function bootstrap(): Promise<void> {
   await registerAskRoutes(app);
 
   await app.listen({ host: "0.0.0.0", port: config.PORT });
+  app.log.info(`Google OAuth redirect_uri: ${config.GOOGLE_REDIRECT_URI} — добавь этот URL в Google Console`);
 }
 
 bootstrap().catch((error) => {
