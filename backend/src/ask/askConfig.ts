@@ -19,7 +19,7 @@ export const MODE_MODELS: Record<
     pragmatist: "deepseek-r1:7b",
     explainer: "llama3.2:3b",
     aggregator: "llama3.2:3b",
-    imageFast: "phi4:mini",
+    imageFast: "llama3.2:3b",
     deepResearch: "llama3.2:3b",
     vision: "llava"
   },
@@ -29,7 +29,7 @@ export const MODE_MODELS: Record<
     pragmatist: "deepseek-r1:7b",
     explainer: "llama3.2:3b",
     aggregator: "llama3.2:3b",
-    imageFast: "phi4:mini",
+    imageFast: "llama3.2:3b",
     deepResearch: "llama3.2:3b",
     vision: "llava"
   },
@@ -39,7 +39,7 @@ export const MODE_MODELS: Record<
     pragmatist: "deepseek-r1:7b",
     explainer: "llama3.2:3b",
     aggregator: "llama3.2:3b",
-    imageFast: "phi4:mini",
+    imageFast: "llama3.2:3b",
     deepResearch: "llama3.2:3b",
     vision: "llava"
   }
@@ -53,7 +53,7 @@ const SIMPLE_TIMEOUT_MS = 25000;
 
 export const ollamaConfig = {
   baseUrl: process.env.OLLAMA_BASE_URL ?? "http://localhost:11434/v1",
-  timeoutMs: Number(process.env.OLLAMA_TIMEOUT_MS ?? 90000),
+  timeoutMs: Number(process.env.OLLAMA_TIMEOUT_MS ?? 60000),
   simpleTimeoutMs: Number(process.env.OLLAMA_SIMPLE_TIMEOUT_MS ?? SIMPLE_TIMEOUT_MS),
   visionTimeoutMs: Number(process.env.OLLAMA_VISION_TIMEOUT_MS ?? 45000),
   agentConcurrency: Math.max(1, Number(process.env.OLLAMA_AGENT_CONCURRENCY ?? 2)),

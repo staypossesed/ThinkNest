@@ -1,8 +1,8 @@
 import { chatCompletion } from "./ollama";
 import { ollamaConfig } from "./config";
 
-/** phi3 — быстрая модель из обязательного набора, всегда установлена */
-const QUERY_MODEL = "phi3";
+/** Быстрая модель из обязательного набора (llama3.2:3b, qwen2.5:3b) */
+const QUERY_MODEL = "llama3.2:3b";
 const QUERY_TIMEOUT_MS = 5000;
 
 /**

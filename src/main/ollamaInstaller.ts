@@ -128,8 +128,8 @@ export const HARDWARE_PROFILES = {
   light: {
     label: "Слабый CPU (4–8 GB RAM)",
     labelEn: "Light CPU (4–8 GB RAM)",
-    models: ["phi4:mini", "llama3.2:3b"],
-    agentModel: "phi4:mini",
+    models: ["llama3.2:3b", "qwen2.5:3b"],
+    agentModel: "llama3.2:3b",
     aggregatorModel: "llama3.2:3b"
   },
   medium: {

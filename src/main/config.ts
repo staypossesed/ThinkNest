@@ -17,7 +17,7 @@ export const MODE_MODELS: Record<OllamaMode, {
     pragmatist: "deepseek-r1:7b",
     explainer: "llama3.2:3b",
     aggregator: "llama3.2:3b",
-    imageFast: "phi4:mini",
+    imageFast: "llama3.2:3b",
     deepResearch: "llama3.2:3b",
     vision: "llava"
   },
@@ -27,7 +27,7 @@ export const MODE_MODELS: Record<OllamaMode, {
     pragmatist: "deepseek-r1:7b",
     explainer: "llama3.2:3b",
     aggregator: "llama3.2:3b",
-    imageFast: "phi4:mini",
+    imageFast: "llama3.2:3b",
     deepResearch: "llama3.2:3b",
     vision: "llava"
   },
@@ -37,7 +37,7 @@ export const MODE_MODELS: Record<OllamaMode, {
     pragmatist: "deepseek-r1:7b",
     explainer: "llama3.2:3b",
     aggregator: "llama3.2:3b",
-    imageFast: "phi4:mini",
+    imageFast: "llama3.2:3b",
     deepResearch: "llama3.2:3b",
     vision: "llava"
   }
@@ -80,7 +80,7 @@ export const ollamaConfig = {
   },
   aggregatorModel: process.env.OLLAMA_AGGREGATOR_MODEL ?? "llama3.2:3b",
   /** Быстрый профиль для image-only/vision сценариев. */
-  imageFastModel: process.env.OLLAMA_IMAGE_FAST_MODEL ?? "phi4:mini",
+  imageFastModel: process.env.OLLAMA_IMAGE_FAST_MODEL ?? "llama3.2:3b",
   /** Vision model для распознавания картинок (llava, llava:7b и т.п.) */
   visionModel: process.env.OLLAMA_VISION_MODEL ?? "llava"
 };
