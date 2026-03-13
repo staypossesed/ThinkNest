@@ -1,4 +1,10 @@
-import "dotenv/config";
+import path from "node:path";
+import dotenv from "dotenv";
+
+// Всегда загружать .env из папки backend. override=true — чтобы системный env не перезаписывал
+const envPath = path.resolve(__dirname, "../.env");
+dotenv.config({ path: envPath, override: true });
+
 import { z } from "zod";
 
 const optionalString = z.preprocess(
