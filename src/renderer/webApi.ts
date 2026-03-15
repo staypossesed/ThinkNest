@@ -20,8 +20,12 @@ import {
   webGetEntitlements,
   webGetSession,
   webLoginWithGoogle,
-  webLogout
+  webLogout,
+  webGetSubscription,
+  webOpenCheckout,
+  webOpenPortal
 } from "./webBackendClient";
+import { debug, debugWarn } from "./debug";
 
 const DEMO_ENTITLEMENTS: Entitlements = {
   plan: "free",
@@ -63,9 +67,9 @@ function getDemoAnswers(): AgentAnswer[] {
 let backendAvailable: boolean | null = null;
 
 async function ensureBackendCheck(): Promise<boolean> {
-  // Кэшируем только true — при false всегда перепроверяем (backend мог запуститься позже)
   if (backendAvailable === true) return true;
   backendAvailable = await webCheckBackend();
+  debug("webApi", "ensureBackendCheck", { backendAvailable });
   return backendAvailable;
 }
 
@@ -85,7 +89,9 @@ export function createWebApi() {
           return await webAsk(payload, onAnswer);
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
+          debugWarn("webApi", "ask error", { msg });
           if (msg.includes("401") || msg.includes("Unauthorized")) {
+            debug("webApi", "ask 401 - returning login prompt");
             const demoAnswers = getDemoAnswers().slice(0, 2);
             for (const a of demoAnswers) onAnswer?.(a);
             return {
@@ -165,7 +171,15 @@ export function createWebApi() {
       }
       return { entitlements: DEMO_ENTITLEMENTS };
     },
-    async openCheckout(_plan?: "weekly" | "monthly" | "yearly"): Promise<{ ok: true }> {
+    async openCheckout(plan?: "weekly" | "monthly" | "yearly"): Promise<{ ok: true }> {
+      if (await ensureBackendCheck()) {
+        try {
+          await webOpenCheckout(plan ?? "monthly");
+        } catch (e) {
+          debugWarn("webApi", "openCheckout failed", e);
+          throw e;
+        }
+      }
       return { ok: true };
     },
     async getSubscription(): Promise<{
@@ -175,10 +189,25 @@ export function createWebApi() {
       currentPeriodEnd: string | null;
       cancelAtPeriodEnd: boolean;
     }> {
+      if (await ensureBackendCheck()) {
+        try {
+          return await webGetSubscription();
+        } catch {
+          return { active: false, plan: null, interval: null, currentPeriodEnd: null, cancelAtPeriodEnd: false };
+        }
+      }
       return { active: false, plan: null, interval: null, currentPeriodEnd: null, cancelAtPeriodEnd: false };
     },
     async openPortal(): Promise<{ ok: true }> {
-      return { ok: true };
+      if (await ensureBackendCheck()) {
+        try {
+          await webOpenPortal();
+        } catch (e) {
+          debugWarn("webApi", "openPortal failed", e);
+          throw e;
+        }
+      }
+      return { ok: true as const };
     },
     async openExternal(url: string): Promise<void> {
       window.open(url, "_blank");

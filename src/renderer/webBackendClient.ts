@@ -10,6 +10,7 @@ import type {
   Entitlements,
   SessionState
 } from "../shared/types";
+import { debug, debugError, debugWarn } from "./debug";
 
 const TOKEN_KEY = "thinknest_web_token";
 
@@ -61,11 +62,13 @@ async function request<T>(
 
   const res = await fetch(url, { ...init, headers });
   if (res.status === 401) {
+    debugWarn("webBackend", "request 401", { path: url });
     setToken(null);
     throw new Error("Unauthorized");
   }
   if (!res.ok) {
     const text = await res.text();
+    debugWarn("webBackend", "request error", { path: url, status: res.status, text: text.slice(0, 100) });
     throw new Error(`API ${res.status}: ${text.slice(0, 200)}`);
   }
   return res.json() as Promise<T>;
@@ -75,12 +78,14 @@ const emptySession: SessionState = { token: null, user: null };
 
 export async function webGetSession(): Promise<SessionState> {
   const token = getToken();
+  debug("webBackend", "getSession", { hasToken: !!token, tokenLen: token?.length ?? 0 });
   if (!token) return emptySession;
   try {
     const profile = await request<{ id: string; email: string; fullName: string | null; avatarUrl: string | null }>(
       "/me",
       { method: "GET" }
     );
+    debug("webBackend", "getSession success", { email: profile?.email });
     return {
       token,
       user: {
@@ -90,17 +95,20 @@ export async function webGetSession(): Promise<SessionState> {
         avatarUrl: profile.avatarUrl
       }
     };
-  } catch {
+  } catch (e) {
+    debugWarn("webBackend", "getSession failed", e);
     return emptySession;
   }
 }
 
 export async function webLoginWithGoogle(): Promise<SessionState> {
   const redirect = window.location.origin + window.location.pathname + window.location.search;
+  debug("webBackend", "loginWithGoogle", { redirect });
   const start = await request<{ state: string; authUrl: string }>(
     `/auth/google/start?mode=web&redirect=${encodeURIComponent(redirect)}`,
     { method: "GET", auth: false }
   );
+  debug("webBackend", "loginWithGoogle redirecting to", start.authUrl?.slice(0, 60) + "...");
   window.location.href = start.authUrl;
   return emptySession;
 }
@@ -127,32 +135,74 @@ export async function webConsumeUsage(question: string): Promise<ConsumeUsageRes
   });
 }
 
+export async function webGetSubscription(): Promise<{
+  active: boolean;
+  plan: string | null;
+  interval: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+}> {
+  try {
+    return await request("/billing/subscription", { method: "GET" });
+  } catch {
+    return { active: false, plan: null, interval: null, currentPeriodEnd: null, cancelAtPeriodEnd: false };
+  }
+}
+
+export async function webOpenCheckout(plan: "weekly" | "monthly" | "yearly"): Promise<void> {
+  const res = await request<{ url: string | null }>("/billing/checkout", {
+    method: "POST",
+    body: JSON.stringify({ plan })
+  });
+  if (res?.url) window.open(res.url, "_blank");
+}
+
+export async function webOpenPortal(): Promise<void> {
+  const res = await request<{ url: string }>("/billing/portal", { method: "POST" });
+  if (res?.url) window.open(res.url, "_blank");
+}
+
 export async function webAsk(
   payload: AskRequest,
   onAnswer?: (answer: AgentAnswer) => void
 ): Promise<AskResponse> {
-  const res = await request<AskResponse>("/ask", {
-    method: "POST",
-    body: JSON.stringify(payload)
-  });
-  for (const a of res.answers) onAnswer?.(a);
-  return res;
+  debug("webBackend", "ask", { question: payload.question?.slice(0, 50), hasToken: !!getToken() });
+  try {
+    const res = await request<AskResponse>("/ask", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    debug("webBackend", "ask success", { answersCount: res.answers?.length, hasFinal: !!res.final });
+    for (const a of res.answers) onAnswer?.(a);
+    return res;
+  } catch (e) {
+    debugError("webBackend", "ask failed", e);
+    throw e;
+  }
 }
 
 export async function webCheckBackend(): Promise<boolean> {
-  const url = "/health";
+  const base = getBackendUrl();
+  const url = `${base || ""}/health`;
+  debug("webBackend", "checkBackend", { url: url || "(same-origin /health)" });
   const opts = { headers: ngrokHeaders(), signal: AbortSignal.timeout(5000) };
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const res = await fetch(url, opts);
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
-        if (data?.ok === true || data?.service) return true;
+        if (data?.ok === true || data?.service) {
+          debug("webBackend", "checkBackend ok", { attempt: attempt + 1 });
+          return true;
+        }
       }
-    } catch {
+      debugWarn("webBackend", "checkBackend non-ok", { status: res.status, attempt: attempt + 1 });
+    } catch (e) {
+      debugWarn("webBackend", "checkBackend error", { attempt: attempt + 1, error: e });
       if (attempt < 2) await new Promise((r) => setTimeout(r, 300));
     }
   }
+  debug("webBackend", "checkBackend false");
   return false;
 }
 
@@ -160,13 +210,16 @@ export function webCompleteAuth(): boolean {
   const params = new URLSearchParams(window.location.search);
   const state = params.get("state");
   const authError = params.get("authError");
+  debug("webBackend", "completeAuth", { hasState: !!state, authError });
   if (authError) {
+    debugWarn("webBackend", "completeAuth authError", authError);
     window.history.replaceState({}, "", window.location.pathname);
     return false;
   }
   if (!state) return false;
   window.history.replaceState({}, "", window.location.pathname);
   pollAuthToken(state).then((token) => {
+    debug("webBackend", "completeAuth poll done", { gotToken: !!token });
     if (token) setToken(token);
     window.location.reload();
   });

@@ -13,6 +13,9 @@ if (typeof win.api === "undefined") {
   } else {
     win.api = createWebApi();
     document.body.classList.add("web-mode");
+    if (typeof window !== "undefined" && window.location?.search?.includes("debug=1")) {
+      console.log("[ThinkNest] Debug mode enabled. Add ?debug=1 to URL or localStorage.thinknest_debug=1");
+    }
   }
 }
 

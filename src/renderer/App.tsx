@@ -20,6 +20,7 @@ import { usePlaceholder } from "./hooks/usePlaceholder";
 import { useMemory } from "./hooks/useMemory";
 import { t } from "./i18n";
 import { isWebMode } from "./webApi";
+import { debug, debugWarn } from "./debug";
 
 const ONBOARDING_DONE_KEY = "thinknest_onboarding_done";
 const MODE_STORAGE_KEY = "thinknest_mode";
@@ -139,16 +140,20 @@ export default function App() {
     const bootstrap = async () => {
       try {
         if (typeof window.api === "undefined") {
+          debugWarn("App", "bootstrap: no window.api");
           setError("API недоступен. Перезапустите приложение.");
           return;
         }
         const isDev = await window.api.isDevMode();
         setDevMode(isDev);
+        debug("App", "bootstrap", { isDev });
         const currentSession = await window.api.getSession();
         setSession(currentSession);
+        debug("App", "bootstrap session", { hasToken: !!currentSession.token, email: currentSession.user?.email });
         if (isDev || currentSession.token) {
           const currentEntitlements = await window.api.getEntitlements();
           setEntitlements(currentEntitlements);
+          debug("App", "bootstrap entitlements", { plan: currentEntitlements?.plan, maxAgents: currentEntitlements?.maxAgents });
           if (currentSession.token && window.api.getSubscription) {
             try {
               const sub = await window.api.getSubscription();
@@ -157,10 +162,18 @@ export default function App() {
               setSubscription(null);
             }
           }
+        } else if (isWebMode()) {
+          try {
+            const currentEntitlements = await window.api.getEntitlements();
+            setEntitlements(currentEntitlements);
+          } catch {
+            setEntitlements(null);
+          }
         }
       } catch (err) {
         const message =
           err instanceof Error ? err.message : t(uiLocale, "loadSessionFailed");
+        debugWarn("App", "bootstrap error", err);
         setError(message);
       } finally {
         setLoadingSession(false);
@@ -238,9 +251,11 @@ export default function App() {
     const hasContent = trimmed || attachedImages.length > 0;
     if (!hasContent || isLoadingInCurrentChat) return;
     if (!devMode && !session.token) {
+      debug("App", "submit blocked: no session");
       setError(t(uiLocale, "loginFirst"));
       return;
     }
+    debug("App", "submit", { question: trimmed.slice(0, 30), hasSession: !!session.token });
 
     const questionText =
       trimmed ||
