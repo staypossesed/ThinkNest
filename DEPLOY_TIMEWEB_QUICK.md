@@ -6,21 +6,14 @@
 
 ## English
 
-For servers without GPU. Path: `/var/www/thinknest/ThinkNest`.
-
-**Quick fix** (if already cloned but seeing demo-version):
-
 ```bash
 cd /var/www/thinknest/ThinkNest
-npm run build:renderer
-npm run build:backend
-# Update backend/.env: OLLAMA_TIMEOUT_MS=90000, OLLAMA_BASE_URL=http://localhost:11434/v1
+npm run build:renderer && npm run build:backend
 pm2 restart thinknest-backend || pm2 start ecosystem-backend.config.js --name thinknest-backend
 pm2 save
-# Configure Nginx (see Русский section)
 ```
 
-**Full guide:** See [Русский](#русский) section below.
+Full guide: [Русский](#русский).
 
 ---
 
@@ -225,18 +218,11 @@ pm2 restart thinknest-backend
 
 ## 中文
 
-适用于无 GPU 的服务器。路径：`/var/www/thinknest/ThinkNest`。
-
-**快速修复**（若已克隆但看到 demo 版本）：
-
 ```bash
 cd /var/www/thinknest/ThinkNest
-npm run build:renderer
-npm run build:backend
-# 更新 backend/.env：OLLAMA_TIMEOUT_MS=90000，OLLAMA_BASE_URL=http://localhost:11434/v1
+npm run build:renderer && npm run build:backend
 pm2 restart thinknest-backend || pm2 start ecosystem-backend.config.js --name thinknest-backend
 pm2 save
-# 配置 Nginx（见 Русский 部分）
 ```
 
-**完整指南：** 参见下方 [Русский](#русский) 部分。
+完整指南：[Русский](#русский)。

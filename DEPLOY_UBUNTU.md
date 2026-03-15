@@ -6,19 +6,14 @@
 
 ## English
 
-**Quick update** (if already deployed):
-
 ```bash
 cd /home/www/ThinkNest
-git pull
-npm install
-npm --prefix backend install
-npm run build:backend
-npm run build:renderer
+git pull && npm install && npm --prefix backend install
+npm run build:backend && npm run build:renderer
 pm2 restart thinknest-backend
 ```
 
-**Full guide:** See [Русский](#русский) section below for step-by-step: clone → server → working site. Users sign in with Google and pay Stripe subscription.
+Full guide: [Русский](#русский).
 
 ---
 
@@ -423,16 +418,11 @@ location.reload();
 
 ## 中文
 
-**快速更新**（若已部署）：
-
 ```bash
 cd /home/www/ThinkNest
-git pull
-npm install
-npm --prefix backend install
-npm run build:backend
-npm run build:renderer
+git pull && npm install && npm --prefix backend install
+npm run build:backend && npm run build:renderer
 pm2 restart thinknest-backend
 ```
 
-**完整指南：** 参见下方 [Русский](#русский) 部分，从克隆到服务器的分步说明。用户通过 Google 登录并支付 Stripe 订阅。
+完整指南：[Русский](#русский)。
