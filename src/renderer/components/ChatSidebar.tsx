@@ -239,7 +239,7 @@ export default function ChatSidebar({
             </p>
             {entitlements && (
               <p className="text-xs text-gray-500">
-                Обычный: ∞ · Мульти: {entitlements.usedMultiAnswer ?? 0}/{entitlements.maxMultiAnswer ?? 100}
+                {t(uiLocale, "normalMode")}: ∞ · {t(uiLocale, "multiMode")}: {entitlements.usedMultiAnswer ?? 0}/{entitlements.maxMultiAnswer ?? 100}
               </p>
             )}
             {entitlements?.plan === "pro" && (
