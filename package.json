@@ -20,7 +20,8 @@
     "build": "npm run build:renderer && npm run build:main && npm run build:backend",
     "preview": "npm run build:renderer && vite preview --config vite.config.ts --host",
     "package": "npm run build && electron-builder",
-    "test": "echo \"No tests configured\" && exit 0"
+    "test": "echo \"No tests configured\" && exit 0",
+    "test:billing": "node scripts/test-billing.mjs"
   },
   "keywords": [],
   "author": "",

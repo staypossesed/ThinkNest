@@ -154,12 +154,20 @@ export async function webOpenCheckout(plan: "weekly" | "monthly" | "yearly"): Pr
     method: "POST",
     body: JSON.stringify({ plan })
   });
-  if (res?.url) window.open(res.url, "_blank");
+  if (res?.url) {
+    window.open(res.url, "_blank");
+  } else {
+    throw new Error("Stripe checkout URL is missing. Check backend Stripe config.");
+  }
 }
 
 export async function webOpenPortal(): Promise<void> {
   const res = await request<{ url: string }>("/billing/portal", { method: "POST" });
-  if (res?.url) window.open(res.url, "_blank");
+  if (res?.url) {
+    window.open(res.url, "_blank");
+  } else {
+    throw new Error("Stripe portal URL is missing. Check backend Stripe config.");
+  }
 }
 
 export async function webAsk(

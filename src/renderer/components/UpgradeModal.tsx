@@ -7,9 +7,9 @@ interface UpgradeModalProps {
 }
 
 const PLANS = [
-  { id: "weekly" as const, emoji: "📅", label: { ru: "Неделя", en: "Week", zh: "周" }, price: { ru: "$4.99/нед", en: "$4.99/week", zh: "$4.99/周" } },
-  { id: "monthly" as const, emoji: "📆", label: { ru: "Месяц", en: "Month", zh: "月" }, price: { ru: "$14.99/мес", en: "$14.99/month", zh: "$14.99/月" } },
-  { id: "yearly" as const, emoji: "🎁", label: { ru: "Год (скидка 30%)", en: "Year (30% off)", zh: "年 (7折)" }, price: { ru: "$149.99/год", en: "$149.99/year", zh: "$149.99/年" } }
+  { id: "weekly" as const, emoji: "📅", label: { ru: "Неделя", en: "Week", zh: "周" }, price: { ru: "$4.99/нед", en: "$4.99/week", zh: "$4.99/周" }, badge: null },
+  { id: "monthly" as const, emoji: "📆", label: { ru: "Месяц", en: "Month", zh: "月" }, price: { ru: "$14.99/мес", en: "$14.99/month", zh: "$14.99/月" }, badge: null },
+  { id: "yearly" as const, emoji: "🎁", label: { ru: "Год", en: "Year", zh: "年" }, price: { ru: "$149.99/год", en: "$149.99/year", zh: "$149.99/年" }, badge: { ru: "Год+год бесплатно", en: "Buy 1 get 1 free", zh: "买一送一" } }
 ];
 
 export default function UpgradeModal({ uiLocale, onClose, onSelectPlan }: UpgradeModalProps) {
@@ -40,8 +40,15 @@ export default function UpgradeModal({ uiLocale, onClose, onSelectPlan }: Upgrad
               onClick={() => onSelectPlan(p.id)}
             >
               <span className="upgrade-modal-plan-emoji">{p.emoji}</span>
-              <span className="upgrade-modal-plan-label">{p.label[loc] || p.label.en}</span>
-              <span className="upgrade-modal-plan-price">{p.price[loc] || p.price.en}</span>
+              <div className="flex flex-1 flex-col items-start gap-0.5">
+                <span className="upgrade-modal-plan-label">{p.label[loc] || p.label.en}</span>
+                <span className="upgrade-modal-plan-price">{p.price[loc] || p.price.en}</span>
+                {p.badge && (
+                  <span className="rounded bg-purple-500/20 px-2 py-0.5 text-xs text-purple-300">
+                    {p.badge[loc] || p.badge.en}
+                  </span>
+                )}
+              </div>
             </button>
           ))}
         </div>

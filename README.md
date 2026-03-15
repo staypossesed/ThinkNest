@@ -129,11 +129,30 @@ PORT=3000
 | [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) | Деплой на Ubuntu — от клона до работающей ссылки |
 | [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md) | Web-режим, ngrok |
 | [STRIPE_SETUP.md](./STRIPE_SETUP.md) | Stripe, подписки |
+| [docs/BILLING_VERIFY.md](./docs/BILLING_VERIFY.md) | Проверка оплаты (тесты, инструкции) |
 | [PUBLISHING.md](./PUBLISHING.md) | Публикация репо |
 
 ---
 
 ## История исправлений (Changelog)
+
+### 2026-03-15
+
+**Добавлено:**
+- **Кнопка «Моя подписка»** — для Pro-пользователей, открывает Stripe Customer Portal (управление подпиской)
+- **Счётчик дней** — под кнопкой отображается «X дней до конца» и дата окончания подписки
+- **Переводы** — `mySubscription`, `daysLeft`, `subscriptionEndsIn`, `manageSubscription` (ru/en/zh)
+- **Бейдж «Год+год бесплатно»** — в модале выбора плана для тарифа «Год» (купон)
+- **GET /billing/status** — эндпоинт проверки конфигурации Stripe (configured, hasPrices, hasSuccessUrl, hasCancelUrl)
+- **`npm run test:billing`** — скрипт проверки billing/status и health
+- **docs/BILLING_VERIFY.md** — инструкция по проверке оплаты
+
+**Изменено:**
+- **ChatSidebar** — кнопка «Моя подписка» вместо «Billing» для Pro, под ней дни до конца
+- **webOpenCheckout / webOpenPortal** — выброс ошибки, если Stripe вернул `url: null`
+- **UpgradeModal** — бейдж купона для yearly, обновлён layout планов
+
+---
 
 ### 2026-02-27
 

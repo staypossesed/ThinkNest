@@ -580,8 +580,9 @@ body {
 
 .upgrade-modal-plan {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
+  text-align: left;
   padding: 14px 16px;
   background: var(--bg-card-hover);
   border: 1px solid var(--border);

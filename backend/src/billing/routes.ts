@@ -60,6 +60,15 @@ function getPriceIdForPlan(plan: BillingPlan): string {
 }
 
 export async function registerBillingRoutes(app: FastifyInstance): Promise<void> {
+  app.get("/billing/status", async (_request, reply) => {
+    return {
+      configured: stripeEnabled,
+      hasPrices: Boolean(stripePriceIds.weekly || stripePriceIds.monthly || stripePriceIds.yearly),
+      hasSuccessUrl: Boolean(config.STRIPE_SUCCESS_URL),
+      hasCancelUrl: Boolean(config.STRIPE_CANCEL_URL)
+    };
+  });
+
   app.post(
     "/billing/checkout",
     { preHandler: [app.authenticate] },

@@ -209,24 +209,35 @@ export default function ChatSidebar({
                 {entitlements.usedQuestions}/{entitlements.maxQuestions}
               </p>
             )}
-            {subscription?.active && subscription.currentPeriodEnd && (
-              <p className="mt-1 text-xs text-gray-500">
-                {subscription.cancelAtPeriodEnd
-                  ? (uiLocale === "ru"
-                      ? "Отмена после периода"
-                      : uiLocale === "zh"
-                        ? "期后取消"
-                        : "Cancels after period")
-                  : (uiLocale === "ru"
-                      ? "Автосписание: "
-                      : uiLocale === "zh"
-                        ? "自动续费："
-                        : "Next billing: ") +
-                    new Date(subscription.currentPeriodEnd).toLocaleDateString(
-                      uiLocale === "ru" ? "ru-RU" : uiLocale === "zh" ? "zh-CN" : "en-US",
-                      { day: "numeric", month: "short", year: "numeric" }
-                    )}
-              </p>
+            {entitlements?.plan === "pro" && (
+              <>
+                <button
+                  type="button"
+                  className="mt-2 w-full rounded-xl bg-purple-600/80 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-500"
+                  onClick={onManageBilling}
+                  title={t(uiLocale, "manageSubscription")}
+                >
+                  {t(uiLocale, "mySubscription")}
+                </button>
+                {subscription?.active && subscription.currentPeriodEnd && (() => {
+                  const endDate = new Date(subscription.currentPeriodEnd);
+                  const now = new Date();
+                  const daysLeft = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));
+                  return (
+                    <p className="mt-1.5 text-center text-xs text-gray-500">
+                      {subscription.cancelAtPeriodEnd
+                        ? (uiLocale === "ru" ? "Отмена после периода" : uiLocale === "zh" ? "期后取消" : "Cancels after period")
+                        : `${daysLeft} ${t(uiLocale, "daysLeft")}`}
+                      {" · "}
+                      {endDate.toLocaleDateString(uiLocale === "ru" ? "ru-RU" : uiLocale === "zh" ? "zh-CN" : "en-US", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric"
+                      })}
+                    </p>
+                  );
+                })()}
+              </>
             )}
             <div className="mt-3 flex flex-wrap gap-2">
               <button
@@ -243,15 +254,6 @@ export default function ChatSidebar({
                   onClick={onUpgrade}
                 >
                   {t(uiLocale, "pro")}
-                </button>
-              )}
-              {entitlements?.plan === "pro" && (
-                <button
-                  type="button"
-                  className="rounded-lg px-3 py-1.5 text-xs text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
-                  onClick={onManageBilling}
-                >
-                  {t(uiLocale, "billing")}
                 </button>
               )}
               <button
