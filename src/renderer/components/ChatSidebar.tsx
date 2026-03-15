@@ -235,7 +235,7 @@ export default function ChatSidebar({
         ) : session.user ? (
           <>
             <p className="text-xs text-gray-500">
-              {profileName} • {entitlements?.plan ?? "—"}
+              {profileName} • {entitlements?.plan ? t(uiLocale, entitlements.plan === "pro" ? "planPro" : "planFree") : "—"}
             </p>
             {entitlements && (
               <p className="text-xs text-gray-500">
