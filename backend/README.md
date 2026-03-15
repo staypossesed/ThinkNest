@@ -1,18 +1,18 @@
 # Backend (Stripe + Auth + Entitlements)
 
-## Run locally
+## Локальный запуск
 
-1. Copy `.env.example` to `.env` and fill values.
-2. Apply SQL migration in Supabase SQL editor:
+1. Скопируй `.env.example` в `.env` и заполни значения.
+2. Примени SQL-миграцию в Supabase SQL editor:
    - `supabase/migrations/001_init.sql`
-3. Install and run:
+3. Установи и запусти:
    - `npm install`
    - `npm run dev`
 
 ## Endpoints
 
 - `GET /health`
-- `GET /portal` (web login + billing one-page)
+- `GET /portal` (веб-логин + billing одностраничник)
 - `GET /auth/google/start`
 - `GET /auth/google/poll?state=...`
 - `GET /auth/google/callback`

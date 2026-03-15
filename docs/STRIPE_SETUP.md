@@ -1,91 +1,91 @@
-# Stripe setup: connect your 3 products to the project
+# Настройка Stripe: подключение 3 продуктов к проекту
 
 ---
 
-## Server-side AI (models on server)
+## Серверный AI (модели на сервере)
 
-The app now supports **server-side models**: users don't need to install Ollama. The backend runs the AI agents. Configure:
+Приложение поддерживает **серверные модели**: пользователям не нужно устанавливать Ollama. Бэкенд запускает AI-агентов. Настройка:
 
-1. **Deploy Ollama** on a server (same machine as backend, or a separate VM).
-2. Install models: `ollama pull llama3.1:8b && ollama pull qwen2.5:7b` (optional: `ollama pull llava` for images)
-3. In `backend/.env` set: `OLLAMA_BASE_URL=http://your-ollama-server:11434/v1`
-4. When running `npm run dev` (not `dev:local`), the desktop app uses the backend for ask — no local Ollama needed.
-
----
-
-# Stripe setup
-
-Your app already has Stripe integration (Checkout + Customer Portal + webhooks). Follow these steps to connect the products you created (Pro Weekly, Pro Monthly, Pro Yearly).
+1. **Разверни Ollama** на сервере (та же машина, что и бэкенд, или отдельная VM).
+2. Установи модели: `ollama pull llama3.1:8b && ollama pull qwen2.5:7b` (опционально: `ollama pull llava` для изображений)
+3. В `backend/.env` укажи: `OLLAMA_BASE_URL=http://your-ollama-server:11434/v1`
+4. При запуске `npm run dev` (не `dev:local`) десктопное приложение использует бэкенд для ask — локальный Ollama не нужен.
 
 ---
 
-## 1. Get API keys
+# Настройка Stripe
 
-1. Open [Stripe Dashboard](https://dashboard.stripe.com) → **Developers** → **API keys**.
-2. Copy:
-   - **Secret key** (starts with `sk_test_` in sandbox) → `STRIPE_SECRET_KEY`
-   - Keep **Publishable key** for future use if you add a web checkout page.
+В приложении уже есть интеграция Stripe (Checkout + Customer Portal + webhooks). Следуй шагам, чтобы подключить созданные продукты (Pro Weekly, Pro Monthly, Pro Yearly).
 
 ---
 
-## 2. Get Price IDs for your 3 products
+## 1. Получить API-ключи
 
-The backend needs **Price IDs** (not Product IDs). Each product has at least one Price.
-
-1. Go to **Product catalog** → **All products**.
-2. For each product, click the product name:
-   - **Pro Weekly** → open product → under **Pricing**, find the price (e.g. $4.99 USD / week) → copy the **Price ID** (starts with `price_`) → use for `STRIPE_PRICE_WEEKLY`.
-   - **Pro Monthly** → same → copy Price ID → `STRIPE_PRICE_MONTHLY`.
-   - **Pro Yearly** → same → copy Price ID → `STRIPE_PRICE_YEARLY`.
-
-If you have only one price per product, that ID is what you need.
+1. Открой [Stripe Dashboard](https://dashboard.stripe.com) → **Developers** → **API keys**.
+2. Скопируй:
+   - **Secret key** (начинается с `sk_test_` в sandbox) → `STRIPE_SECRET_KEY`
+   - **Publishable key** сохрани для будущего, если добавишь веб-страницу оформления заказа.
 
 ---
 
-## 3. Create a webhook
+## 2. Получить Price ID для 3 продуктов
+
+Бэкенду нужны **Price IDs** (не Product IDs). У каждого продукта есть минимум один Price.
+
+1. Перейди в **Product catalog** → **All products**.
+2. Для каждого продукта нажми на название:
+   - **Pro Weekly** → открой продукт → в **Pricing** найди цену (например $4.99 USD / week) → скопируй **Price ID** (начинается с `price_`) → используй для `STRIPE_PRICE_WEEKLY`.
+   - **Pro Monthly** → то же → скопируй Price ID → `STRIPE_PRICE_MONTHLY`.
+   - **Pro Yearly** → то же → скопируй Price ID → `STRIPE_PRICE_YEARLY`.
+
+Если у продукта только одна цена, этот ID и нужен.
+
+---
+
+## 3. Создать webhook
 
 1. **Developers** → **Webhooks** → **Add endpoint**.
-2. **Endpoint URL:**  
-   - Local (with tunnel): `https://<your-ngrok-or-similar>/webhooks/stripe`  
-   - Production: `https://<your-backend-domain>/webhooks/stripe`
-3. **Events to send:** select:
+2. **Endpoint URL:**
+   - Локально (с туннелем): `https://<your-ngrok-or-similar>/webhooks/stripe`
+   - Продакшен: `https://<your-backend-domain>/webhooks/stripe`
+3. **Events to send:** выбери:
    - `checkout.session.completed`
    - `customer.subscription.created`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
-   - `invoice.payment_failed` (optional, for logging)
-4. Create → copy **Signing secret** (starts with `whsec_`) → `STRIPE_WEBHOOK_SECRET`.
+   - `invoice.payment_failed` (опционально, для логирования)
+4. Create → скопируй **Signing secret** (начинается с `whsec_`) → `STRIPE_WEBHOOK_SECRET`.
 
-**Local testing:** Stripe cannot reach `localhost`. Use [ngrok](https://ngrok.com) or [Stripe CLI](https://stripe.com/docs/stripe-cli) (`stripe listen --forward-to localhost:8787/webhooks/stripe`) only when testing on your machine. **Production:** No ngrok — deploy backend to a server (VPS, cloud), set webhook URL to `https://your-api-domain/webhooks/stripe`.
-
----
-
-## 4. Enable Customer Portal
-
-1. **Settings** (gear) → **Billing** → **Customer portal**.
-2. Turn on the portal so users can manage subscription (cancel, update payment).
-3. Set **Return URL** to your app (e.g. `http://localhost:5173` for dev).
+**Локальное тестирование:** Stripe не может достучаться до `localhost`. Используй [ngrok](https://ngrok.com) или [Stripe CLI](https://stripe.com/docs/stripe-cli) (`stripe listen --forward-to localhost:8787/webhooks/stripe`) только при тестах на своей машине. **Продакшен:** без ngrok — разверни бэкенд на сервере (VPS, облако), укажи webhook URL как `https://your-api-domain/webhooks/stripe`.
 
 ---
 
-## 5. Optional: yearly coupon (e.g. 30% off)
+## 4. Включить Customer Portal
 
-You created a coupon like **"30 % Year Subscription Discount"** (30% off once).
+1. **Settings** (шестерёнка) → **Billing** → **Customer portal**.
+2. Включи портал, чтобы пользователи могли управлять подпиской (отмена, обновление платежа).
+3. Укажи **Return URL** на приложение (например `http://localhost:5173` для dev).
 
-1. **Product catalog** → **Coupons** → open your coupon.
-2. Copy the **Coupon ID** (starts with a string like the coupon name; the API ID may look like `ABC123` or similar — use the ID from API/Coupon details).
-3. In `backend/.env` set:
+---
+
+## 5. Опционально: купон на год (например 30% скидка)
+
+Ты создал купон типа **"30 % Year Subscription Discount"** (30% скидка один раз).
+
+1. **Product catalog** → **Coupons** → открой купон.
+2. Скопируй **Coupon ID** (строка вроде имени купона; API ID может выглядеть как `ABC123` — используй ID из API/Coupon details).
+3. В `backend/.env` укажи:
    - `STRIPE_COUPON_1PLUS1=<your-coupon-id>`
-   - The backend applies this automatically when the user selects the **yearly** plan at checkout.
+   - Бэкенд применяет его автоматически, когда пользователь выбирает **годовой** план при оформлении.
 
-If you use **Promotion codes** instead of direct coupon ID, the app can still send `promo_code` in the checkout request body; the backend supports `body.promo_code` for that.
+Если используешь **Promotion codes** вместо прямого Coupon ID, приложение может передавать `promo_code` в теле запроса checkout; бэкенд поддерживает `body.promo_code`.
 
 ---
 
-## 6. Configure backend `.env`
+## 6. Настроить backend `.env`
 
-1. Copy `backend/.env.example` to `backend/.env` (if you haven’t).
-2. Fill Stripe variables:
+1. Скопируй `backend/.env.example` в `backend/.env` (если ещё не сделал).
+2. Заполни переменные Stripe:
 
 ```env
 STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxx
@@ -98,29 +98,29 @@ STRIPE_SUCCESS_URL=http://localhost:5173
 STRIPE_CANCEL_URL=http://localhost:5173
 ```
 
-- **Production:** set `STRIPE_SUCCESS_URL` and `STRIPE_CANCEL_URL` to your real app URL (e.g. your desktop app’s deep link or landing page).
+- **Продакшен:** укажи `STRIPE_SUCCESS_URL` и `STRIPE_CANCEL_URL` на реальный URL приложения (например deep link десктопного приложения или лендинг).
 
 ---
 
-## 7. Run and test
+## 7. Запуск и тест
 
-1. Start backend: from project root, `npm run dev` (or run backend alone on port 8787).
-2. Start desktop: `npm run dev` (or use the built app with `BACKEND_API_URL` pointing to your backend).
-3. In the app: sign in with Google → open **Upgrade / Billing** → choose a plan (e.g. Pro Monthly) → you should be redirected to Stripe Checkout.
-4. Use Stripe test card `4242 4242 4242 4242` to complete payment.
-5. After payment, webhook should run and the user’s subscription should appear in the app (Pro, 4 agents, etc.).
-6. **Billing** / “Manage subscription” should open Stripe Customer Portal.
+1. Запусти бэкенд: из корня проекта `npm run dev` (или только бэкенд на порту 8787).
+2. Запусти десктоп: `npm run dev` (или собранное приложение с `BACKEND_API_URL` на твой бэкенд).
+3. В приложении: войди через Google → открой **Upgrade / Billing** → выбери план (например Pro Monthly) → должен открыться Stripe Checkout.
+4. Используй тестовую карту Stripe `4242 4242 4242 4242` для оплаты.
+5. После оплаты webhook должен отработать, подписка пользователя появится в приложении (Pro, 4 агента и т.д.).
+6. **Billing** / «Manage subscription» должен открывать Stripe Customer Portal.
 
 ---
 
-## Summary: what the project already does
+## Итог: что уже реализовано в проекте
 
-| Feature | Where it’s implemented |
-|--------|-------------------------|
+| Функция | Где реализовано |
+|--------|------------------|
 | Checkout (weekly/monthly/yearly) | `backend/src/billing/routes.ts` → `POST /billing/checkout` |
-| Customer Portal link | `backend/src/billing/routes.ts` → `POST /billing/portal` |
-| Subscription status | `GET /billing/subscription`, entitlements |
-| Webhook (subscription created/updated/deleted) | `backend/src/webhooks/routes.ts` → `POST /webhooks/stripe` |
-| Desktop opening Checkout/Portal | `src/main/backend.ts` → `createCheckoutUrl` / `createPortalUrl`; UI in `App.tsx` and `UpgradeModal` |
+| Ссылка на Customer Portal | `backend/src/billing/routes.ts` → `POST /billing/portal` |
+| Статус подписки | `GET /billing/subscription`, entitlements |
+| Webhook (подписка создана/обновлена/удалена) | `backend/src/webhooks/routes.ts` → `POST /webhooks/stripe` |
+| Десктоп открывает Checkout/Portal | `src/main/backend.ts` → `createCheckoutUrl` / `createPortalUrl`; UI в `App.tsx` и `UpgradeModal` |
 
-You only need to add the correct keys and Price IDs to `backend/.env` and configure the webhook + portal as above.
+Нужно только добавить правильные ключи и Price IDs в `backend/.env` и настроить webhook + portal как выше.

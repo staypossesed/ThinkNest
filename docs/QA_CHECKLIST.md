@@ -1,19 +1,19 @@
 # QA Checklist (MVP)
 
-## Automated checks
+## Автоматические проверки
 
-- [x] `npm run build` (root) passes.
-- [x] `npm --prefix backend run check` passes.
-- [x] Renderer/main/backend TypeScript compile passes.
+- [x] `npm run build` (корень) проходит.
+- [x] `npm --prefix backend run check` проходит.
+- [x] Renderer/main/backend TypeScript компилируется без ошибок.
 
-## Manual e2e checks (run with configured Supabase/Google/Stripe)
+## Ручные e2e проверки (с настроенным Supabase/Google/Stripe)
 
-- [ ] Google login: start, callback, poll, session restore after app restart.
-- [ ] Free entitlement: 2 agents active, 20/day limit enforced.
-- [ ] Usage counter increments after each successful question.
-- [ ] Upgrade flow: Stripe Checkout opens from app and completes.
-- [ ] Webhook sync: subscription becomes `active`, plan switches to `pro`.
-- [ ] Pro entitlement: 4 agents active, 500/month limit.
-- [ ] Billing portal opens and cancellation propagates back to Free.
-- [ ] UX: errors displayed for auth/billing/network failures.
-- [ ] Legal disclaimer visible in question form and understood.
+- [ ] Google login: старт, callback, poll, восстановление сессии после перезапуска приложения.
+- [ ] Free entitlement: 2 агента активны, лимит 20/день соблюдается.
+- [ ] Счётчик использования увеличивается после каждого успешного вопроса.
+- [ ] Upgrade flow: Stripe Checkout открывается из приложения и завершается.
+- [ ] Webhook sync: подписка становится `active`, план переключается на `pro`.
+- [ ] Pro entitlement: 4 агента активны, лимит 500/месяц.
+- [ ] Billing portal открывается, отмена подписки возвращает на Free.
+- [ ] UX: ошибки отображаются при сбоях auth/billing/network.
+- [ ] Юридический дисклеймер виден в форме вопроса и понятен.

@@ -1,8 +1,53 @@
 # ThinkNest
 
-Desktop и веб-приложение с 4 AI-агентами (Strategist, Skeptic, Practitioner, Explainer) и итоговым ответом. Работает локально через Ollama.
+[English](#english) | [Русский](#русский) | [中文](#中文)
 
-## Навигация по документации
+Desktop and web app with 4 AI agents (Strategist, Skeptic, Practitioner, Explainer). Runs locally via Ollama.
+
+---
+
+## English
+
+### Requirements
+
+- Node.js LTS
+- Ollama
+
+### Installation
+
+```bash
+npm install
+npm --prefix backend install
+```
+
+### Ollama models
+
+**Minimum (4 agents):**
+
+```bash
+ollama pull llama3.1:8b
+ollama pull qwen2.5:7b
+```
+
+**Optional (images):** `ollama pull llava`
+
+### Run
+
+**Local (no backend):** `npm run dev:local` — Electron, no Google auth, 4 agents unlimited.
+
+**Full (backend + Google + Stripe):** `npm run dev`
+
+**Web (browser):** `npm run dev:backend` + `npm run dev:renderer` → open http://localhost:5173
+
+### Update & deploy
+
+See [README_FIRST.md](./README_FIRST.md) for quick start. [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) for production. [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md) for ngrok.
+
+---
+
+## Русский
+
+### Навигация по документации
 
 | Цель | Документ |
 |------|----------|
@@ -15,7 +60,7 @@ Desktop и веб-приложение с 4 AI-агентами (Strategist, Ske
 | Проверка оплаты | [docs/BILLING_VERIFY.md](./docs/BILLING_VERIFY.md) |
 | Исправление смешения языков | [docs/FIX_LANGUAGE_MIXING.md](./docs/FIX_LANGUAGE_MIXING.md) |
 
-## Стек
+### Стек
 
 - **Desktop:** Electron + React + TypeScript
 - **Backend (web):** Fastify + Supabase + Stripe + Google OAuth
@@ -24,7 +69,7 @@ Desktop и веб-приложение с 4 AI-агентами (Strategist, Ske
 
 ---
 
-## Требования
+### Требования
 
 - Node.js LTS
 - Ollama
@@ -423,3 +468,42 @@ npm run test:ask-api   # Интеграция: /health, /ask (нужен backend
 2. Открой `http://localhost:8787/health` — скопируй `redirect_uri` оттуда.  
 3. В Google Console → Credentials → OAuth 2.0 Client (с твоим GOOGLE_CLIENT_ID) → Authorized redirect URIs — добавь **точно такой же** URL (копируй из /health).  
 4. Сохрани, подожди 5–10 мин. Добавь оба варианта на всякий случай: `http://localhost:8787/auth/google/callback` и `http://127.0.0.1:8787/auth/google/callback`.
+
+---
+
+## 中文
+
+### 要求
+
+- Node.js LTS
+- Ollama
+
+### 安装
+
+```bash
+npm install
+npm --prefix backend install
+```
+
+### Ollama 模型
+
+**最低（4 个代理）：**
+
+```bash
+ollama pull llama3.1:8b
+ollama pull qwen2.5:7b
+```
+
+**可选（图片）：** `ollama pull llava`
+
+### 运行
+
+**本地（无 backend）：** `npm run dev:local` — Electron，无需 Google 登录，4 个代理无限制。
+
+**完整（backend + Google + Stripe）：** `npm run dev`
+
+**网页（浏览器）：** `npm run dev:backend` + `npm run dev:renderer` → 打开 http://localhost:5173
+
+### 更新与部署
+
+参见 [README_FIRST.md](./README_FIRST.md) 快速开始。[DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) 生产部署。[WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md) ngrok 配置。
