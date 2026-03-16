@@ -1,5 +1,19 @@
 # План деплоя ThinkNest
 
+## Быстрое обновление и запуск
+
+```bash
+cd /home/www/ThinkNest
+git pull
+npm install
+npm --prefix backend install
+npm run build:backend
+npm run build:renderer
+pm2 restart thinknest-backend
+```
+
+---
+
 ## Production: что разворачивается
 
 - **Backend** (Fastify, порт 8787): auth, ask, billing, entitlements, webhooks

@@ -4,6 +4,20 @@
 
 ---
 
+## Быстрое обновление (если уже развёрнуто)
+
+```bash
+cd /home/www/ThinkNest
+git pull
+npm install
+npm --prefix backend install
+npm run build:backend
+npm run build:renderer
+pm2 restart thinknest-backend
+```
+
+---
+
 ## Что нужно до начала
 
 - Ubuntu 22.04 LTS (или 20.04)

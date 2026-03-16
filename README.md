@@ -7,6 +7,7 @@ Desktop и веб-приложение с 4 AI-агентами (Strategist, Ske
 | Цель | Документ |
 |------|----------|
 | Быстрый старт (5 мин) | [README_FIRST.md](./README_FIRST.md) |
+| Обновить и запустить сайт | [README.md#обновление-и-запуск-веб-сайта](#обновление-и-запуск-веб-сайта) |
 | Деплой на сервер (production) | [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) |
 | План деплоя, чеклист | [DEPLOY_PLAN.md](./DEPLOY_PLAN.md) |
 | Web-режим, ngrok | [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md) |
@@ -130,6 +131,24 @@ npm run server
 OLLAMA_HOST=http://127.0.0.1:11434
 PORT=3000
 ```
+
+---
+
+## Обновление и запуск веб-сайта
+
+Если репозиторий уже развёрнут на сервере — обнови файлы и перезапусти:
+
+```bash
+cd /home/www/ThinkNest   # или путь к проекту
+git pull
+npm install
+npm --prefix backend install
+npm run build:backend
+npm run build:renderer
+pm2 restart thinknest-backend
+```
+
+Открой сайт в браузере. Подробнее: [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) (Часть 10).
 
 ---
 

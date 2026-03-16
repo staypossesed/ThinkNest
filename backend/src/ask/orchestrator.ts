@@ -460,8 +460,7 @@ export async function askQuestion(
     onAgentAnswer?.(answer);
     return {
       answers: [answer],
-      final: { content, model: "greeting", durationMs: 0 },
-      webSources: null
+      final: { content, model: "greeting", durationMs: 0 }
     };
   }
 
