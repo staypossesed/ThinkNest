@@ -36,11 +36,11 @@ export default function LanguageSelector({ value, onChange }: LanguageSelectorPr
         type="button"
         className="language-selector-trigger"
         onClick={() => setOpen(!open)}
-        title={`${t(value, "answersIn")}: ${current.label}`}
+        title={`${t(value, "language")}: ${current.label}`}
         aria-expanded={open}
         aria-haspopup="listbox"
       >
-        <span className="language-selector-label">{t(value, "answersIn")}</span>
+        <span className="language-selector-label">{t(value, "language")}</span>
         <span className="language-selector-flag">{current.flag}</span>
       </button>
       {open && (
