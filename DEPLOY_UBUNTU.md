@@ -1,6 +1,6 @@
 # Деплой ThinkNest на Ubuntu — от клонирования до работающей ссылки
 
-Пошаговая инструкция: репозиторий → сервер → работающий сайт.
+Пошаговая инструкция: репозиторий → сервер → работающий сайт. Пользователи входят через Google и оплачивают подписку Stripe.
 
 ---
 
@@ -9,7 +9,7 @@
 - Ubuntu 22.04 LTS (или 20.04)
 - SSH-доступ к серверу
 - Домен (или IP, например 85.239.54.249)
-- Аккаунты: Supabase, Google Cloud (OAuth), Stripe (опционально)
+- Аккаунты: Supabase, Google Cloud (OAuth), Stripe
 
 ---
 
@@ -108,7 +108,7 @@ cp backend/.env.example backend/.env
 nano backend/.env
 ```
 
-Заполни (минимум):
+Заполни (обязательно для production):
 
 ```env
 PORT=8787
@@ -121,13 +121,28 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
 GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=xxx
 GOOGLE_REDIRECT_URI=https://ТВОЙ_ДОМЕН/auth/google/callback
+
+STRIPE_SECRET_KEY=sk_live_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+STRIPE_PRICE_WEEKLY=price_xxx
+STRIPE_PRICE_MONTHLY=price_xxx
+STRIPE_PRICE_YEARLY=price_xxx
+STRIPE_SUCCESS_URL=https://ТВОЙ_ДОМЕН
+STRIPE_CANCEL_URL=https://ТВОЙ_ДОМЕН
+
+OLLAMA_BASE_URL=http://localhost:11434/v1
+OLLAMA_TIMEOUT_MS=90000
 ```
 
-> `APP_ORIGINS` — если нужны доп. origins (через запятую).
+> `APP_ORIGINS` — если нужны доп. origins (через запятую). Stripe: см. [STRIPE_SETUP.md](./STRIPE_SETUP.md).
 
 ### 3.2. Миграции Supabase
 
-Выполни SQL из `backend/supabase/migrations/001_init.sql` в Supabase SQL Editor.
+Выполни SQL в Supabase SQL Editor **по порядку**:
+- `backend/supabase/migrations/001_init.sql`
+- `backend/supabase/migrations/002_free_plan_15.sql`
+- `backend/supabase/migrations/003_subscription_interval.sql`
+- `backend/supabase/migrations/004_pro_70_daily.sql`
 
 ### 3.3. Google OAuth
 
@@ -135,6 +150,11 @@ GOOGLE_REDIRECT_URI=https://ТВОЙ_ДОМЕН/auth/google/callback
 
 - **Authorized JavaScript origins:** `https://ТВОЙ_ДОМЕН`
 - **Authorized redirect URIs:** `https://ТВОЙ_ДОМЕН/auth/google/callback`
+
+### 3.4. Stripe
+
+1. **Webhook:** Developers → Webhooks → Add endpoint → URL: `https://ТВОЙ_ДОМЕН/webhooks/stripe`, события: `checkout.session.completed`, `customer.subscription.*`
+2. **Customer Portal:** Settings → Billing → Customer portal → Return URL: `https://ТВОЙ_ДОМЕН`
 
 ---
 
@@ -281,8 +301,9 @@ pm2 restart thinknest-backend
 ## Часть 9. Проверка
 
 1. Открой в браузере: `http://ТВОЙ_ДОМЕН` (или `https://` после Certbot).
-2. Нажми «Войти через Google».
+2. Нажми «Войти через Google» — авторизация.
 3. Задай вопрос — должен ответить AI.
+4. «Обновить план» → выбери тариф → Stripe Checkout → оплата тестовой картой 4242… → подписка активируется.
 
 ---
 

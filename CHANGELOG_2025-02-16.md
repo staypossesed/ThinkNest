@@ -38,3 +38,36 @@
 ## Fallback и preload
 
 - orchestrator: preloadModel, tryMinimalResponse, fallback — все на llama3.1:8b
+
+---
+
+## UI и сайдбар
+
+- **ChatSidebar**: убраны кнопки Refresh и Settings; переименование чатов, getDisplayTitle, отображение multi-answer для entitlements
+- **ChatMain**: бейдж perspectives только при deep research, 2/4 по плану
+- **App**: refreshEntitlements, синхронизация сессии
+
+## Языки (i18n)
+
+- **LanguageSelector**: «Ответы на» → «Язык»
+- **ExportPanel, ShareButton**: все лейблы через t()
+- **FinalConclusion**: synthesizedFrom2/4, perspectivesHeaderN локализованы
+- **AgentCard, MessageInput, UpgradeModal**: обновления i18n и стилей
+
+## Backend и биллинг
+
+- **billing, entitlements, usage, webhooks**: маршруты и сервисы
+- **ask/routes.ts, types.ts**: обновления API
+- **db.ts, index.ts**: подключение модулей
+
+## Web-клиент и shared
+
+- **webApi, webBackendClient**: клиент для web-режима
+- **shared/types.ts**: общие типы
+- **preload.ts**: exposeInMainWorld для backend-клиента
+
+## Прочее
+
+- **useMemory**: хук
+- **vite.config**: конфиг
+- **BILLING_VERIFY.md**: документация

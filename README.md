@@ -2,6 +2,18 @@
 
 Desktop и веб-приложение с 4 AI-агентами (Strategist, Skeptic, Practitioner, Explainer) и итоговым ответом. Работает локально через Ollama.
 
+## Навигация по документации
+
+| Цель | Документ |
+|------|----------|
+| Быстрый старт (5 мин) | [README_FIRST.md](./README_FIRST.md) |
+| Деплой на сервер (production) | [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) |
+| План деплоя, чеклист | [DEPLOY_PLAN.md](./DEPLOY_PLAN.md) |
+| Web-режим, ngrok | [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md) |
+| Stripe, подписки | [STRIPE_SETUP.md](./STRIPE_SETUP.md) |
+| Проверка оплаты | [docs/BILLING_VERIFY.md](./docs/BILLING_VERIFY.md) |
+| Исправление смешения языков | [FIX_LANGUAGE_MIXING.md](./FIX_LANGUAGE_MIXING.md) |
+
 ## Стек
 
 - **Desktop:** Electron + React + TypeScript
@@ -121,11 +133,134 @@ PORT=3000
 
 ---
 
-## Деплой на VPS
+## Деплой на сервер (production)
 
-1. `server/.env` — `OLLAMA_HOST`, `PORT`
-2. PM2: `pm2 start ecosystem.config.js` или `pm2 start server/index.js --name thinknest`
-3. Nginx: `nginx/thinknest.conf` — прокси 80 → 3000
+Полноценный production: пользователи входят через Google, оплачивают подписку Stripe, получают ответы от AI на сервере. Без демо-режима.
+
+### Что разворачивается
+
+| Компонент | Описание |
+|-----------|----------|
+| **Backend** | Fastify (порт 8787) — auth, ask, billing, entitlements, webhooks |
+| **Frontend** | Статика из `dist/renderer/` (Vite build) |
+| **Ollama** | Модели на том же сервере или отдельном VPS |
+| **Nginx** | Статика + прокси API на backend |
+| **PM2** | Запуск backend |
+
+### Файлы проекта (проверь наличие)
+
+```
+backend/.env.example          → backend/.env
+backend/supabase/migrations/  001_init.sql, 002_free_plan_15.sql, 003_subscription_interval.sql, 004_pro_70_daily.sql
+ecosystem-backend.config.js    PM2 для backend
+nginx/thinknest-full.conf      Nginx: статика + прокси /health, /auth, /me, /ask, /entitlements, /usage, /billing, /portal, /webhooks
+```
+
+### Пошаговый деплой
+
+**1. Подготовка сервера (Ubuntu 22.04):**
+```bash
+sudo apt update && sudo apt upgrade -y
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs nginx git
+sudo npm install -g pm2
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+**2. Клонирование и сборка:**
+```bash
+cd /home && sudo mkdir -p www && sudo chown $USER:$USER www && cd www
+git clone https://github.com/staypossesed/ThinkNest.git
+cd ThinkNest
+
+npm install
+npm --prefix backend install
+npm run build:backend
+npm run build:renderer
+```
+
+**3. Переменные `backend/.env`:**
+```bash
+cp backend/.env.example backend/.env
+nano backend/.env
+```
+
+Заполни (обязательно для production):
+```env
+PORT=8787
+APP_ORIGIN=https://ТВОЙ_ДОМЕН
+APP_JWT_SECRET=длинная-случайная-строка-16+символов
+
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+
+GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=xxx
+GOOGLE_REDIRECT_URI=https://ТВОЙ_ДОМЕН/auth/google/callback
+
+STRIPE_SECRET_KEY=sk_live_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+STRIPE_PRICE_WEEKLY=price_xxx
+STRIPE_PRICE_MONTHLY=price_xxx
+STRIPE_PRICE_YEARLY=price_xxx
+STRIPE_SUCCESS_URL=https://ТВОЙ_ДОМЕН
+STRIPE_CANCEL_URL=https://ТВОЙ_ДОМЕН
+
+OLLAMA_BASE_URL=http://localhost:11434/v1
+OLLAMA_TIMEOUT_MS=90000
+```
+
+**4. Supabase:** выполни миграции в SQL Editor (001 → 002 → 003 → 004).
+
+**5. Google Console:** Authorized redirect URIs — `https://ТВОЙ_ДОМЕН/auth/google/callback`.
+
+**6. Stripe:** Webhook URL — `https://ТВОЙ_ДОМЕН/webhooks/stripe`. Customer Portal — Return URL `https://ТВОЙ_ДОМЕН`.
+
+**7. Модели Ollama:**
+```bash
+ollama pull llama3.1:8b
+ollama pull qwen2.5:7b
+```
+
+**8. Запуск backend:**
+```bash
+pm2 start ecosystem-backend.config.js
+pm2 save
+pm2 startup
+```
+
+**9. Nginx:**
+```bash
+sudo cp nginx/thinknest-full.conf /etc/nginx/sites-available/thinknest
+sudo nano /etc/nginx/sites-available/thinknest
+# Замени ТВОЙ_ДОМЕН на свой домен (или IP), путь root — если клонировал не в /home/www/ThinkNest
+sudo ln -s /etc/nginx/sites-available/thinknest /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+**10. SSL (рекомендуется):**
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d ТВОЙ_ДОМЕН
+```
+
+После Certbot обнови `APP_ORIGIN` и `GOOGLE_REDIRECT_URI` на `https://`, перезапусти backend: `pm2 restart thinknest-backend`.
+
+### Проверка
+
+1. Открой `https://ТВОЙ_ДОМЕН`
+2. «Войти через Google» — авторизация
+3. Задай вопрос — ответ от AI
+4. «Обновить план» — Stripe Checkout, оплата подписки
+
+Подробнее: [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md).
+
+### Альтернатива: только API (Express, без Google/Stripe)
+
+Если нужен только streaming API без auth:
+- `server/.env`: `OLLAMA_HOST`, `PORT=3000`
+- `pm2 start server/index.js --name thinknest`
+- `nginx/thinknest.conf` — прокси 80 → 3000
 
 ---
 

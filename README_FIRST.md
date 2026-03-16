@@ -46,9 +46,9 @@ Open **http://localhost:5173** in Chrome or Edge (not Electron). Sign in with Go
 
 For mobile access: use `ngrok http 5173` and add the ngrok URL to `backend/.env` and Google OAuth. See [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md).
 
-### Full Setup
+### Production Deployment
 
-See [README.md](./README.md) for Supabase, Google OAuth, Stripe, and deployment.
+See [README.md](./README.md) and [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) for full deployment: Google login, Stripe subscriptions, server setup.
 
 ---
 
@@ -96,6 +96,6 @@ npm run dev:renderer
 
 Для доступа с телефона: используй `ngrok http 5173` и добавь ngrok URL в `backend/.env` и Google OAuth. См. [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md).
 
-### Полная настройка
+### Production-деплой
 
-См. [README.md](./README.md) — Supabase, Google OAuth, Stripe и деплой.
+См. [README.md](./README.md) и [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) — вход через Google, подписки Stripe, настройка сервера.

@@ -1,27 +1,24 @@
 # План деплоя ThinkNest
 
-## Что исправлено (сейчас)
+## Production: что разворачивается
 
-1. **isDevMode** — теперь `true` только при `npm run dev:local` (DEV_MODE=true). При `npm run dev` используется backend, Ollama не проверяется.
-2. **Web mode** — в браузере (localhost:5173) корректно определяется web-режим, модалка Ollama не показывается.
-3. **Onboarding** — при backend-режиме показывается «Модели на сервере», кнопка «Начать» без проверки Ollama.
+- **Backend** (Fastify, порт 8787): auth, ask, billing, entitlements, webhooks
+- **Frontend** (статика из `dist/renderer/`)
+- **Ollama** (модели llama3.1:8b, qwen2.5:7b)
+- **Google OAuth** — вход пользователей
+- **Stripe** — подписки (Pro Weekly/Monthly/Yearly)
+
+Пользователи входят через Google и оплачивают подписку. Без демо-режима.
 
 ---
 
-## Как запустить локально (прямо сейчас)
+## Локальный запуск
 
-```powershell
-cd d:\Downloads\multi-agent-desktop
+```bash
 npm run dev
 ```
 
-**Важно:** открывать приложение нужно в **окне Electron** (оно запускается автоматически), а не в браузере. В браузере доступен только режим просмотра.
-
-1. Backend (8787) + Vite (5173) + Electron запустятся.
-2. Откроется окно Electron.
-3. Нажмите «Начать» (без проверки Ollama).
-4. Войдите через Google.
-5. Задайте вопрос — ответ идёт с backend (Ollama на вашем ПК).
+Backend (8787) + Vite (5173) + Electron. Войдите через Google, задайте вопрос — ответ идёт с backend.
 
 ---
 
@@ -52,25 +49,30 @@ npm run dev
 
 3. **Desktop:** при сборке задать `BACKEND_API_URL=https://your-railway-app.railway.app`
 
-### Вариант C: Всё на одном VPS
+### Вариант C: Всё на одном VPS (рекомендуется)
 
-1. Арендовать VPS (Hetzner, DigitalOcean и т.п.).
-2. Установить Node.js, Ollama.
-3. Запустить Ollama: `ollama serve`
-4. Запустить backend: `cd backend && npm run start`
-5. (Опционально) Nginx как reverse proxy для backend.
-6. Собрать desktop с `BACKEND_API_URL=https://your-domain.com`
+Полная инструкция: [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md).
+
+Кратко:
+1. Node.js 20, Ollama, PM2, Nginx
+2. `git clone` → `npm run build:backend` → `npm run build:renderer`
+3. `backend/.env` — Supabase, Google, Stripe, Ollama
+4. Миграции 001–004 в Supabase
+5. `pm2 start ecosystem-backend.config.js`
+6. Nginx: `nginx/thinknest-full.conf` — статика + прокси
+7. SSL: `certbot --nginx -d ТВОЙ_ДОМЕН`
 
 ---
 
 ## Чеклист перед деплоем
 
-- [ ] Supabase: проект создан, миграции выполнены
-- [ ] Google OAuth: redirect URI добавлен для production-домена
-- [ ] Stripe: webhook URL обновлён на production
-- [ ] `backend/.env`: все ключи заполнены для production
-- [ ] Ollama: модели загружены на сервере
-- [ ] `OLLAMA_BASE_URL`: указывает на сервер с Ollama
+- [ ] Supabase: проект создан, миграции 001–004 выполнены
+- [ ] Google OAuth: redirect URI `https://ТВОЙ_ДОМЕН/auth/google/callback`
+- [ ] Stripe: webhook `https://ТВОЙ_ДОМЕН/webhooks/stripe`, Customer Portal Return URL
+- [ ] `backend/.env`: все ключи (Supabase, Google, Stripe, Ollama)
+- [ ] Ollama: `llama3.1:8b`, `qwen2.5:7b` загружены
+- [ ] Nginx: `nginx/thinknest-full.conf` — статика + прокси API
+- [ ] PM2: `ecosystem-backend.config.js`
 
 ---
 

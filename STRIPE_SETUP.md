@@ -1,4 +1,4 @@
-# Stripe setup: connect your 3 products to the project
+﻿# Stripe setup: connect your 3 products to the project
 
 ---
 
