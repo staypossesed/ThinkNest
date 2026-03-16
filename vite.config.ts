@@ -48,7 +48,15 @@ export default defineConfig(({ command }) => ({
       "/health": "http://localhost:8787",
       "/auth": "http://localhost:8787",
       "/me": "http://localhost:8787",
-      "/ask": "http://localhost:8787",
+      "/ask": {
+        target: "http://localhost:8787",
+        configure: (proxy) => {
+          proxy.on("proxyRes", (proxyRes) => {
+            proxyRes.headers["x-accel-buffering"] = "no";
+            proxyRes.headers["cache-control"] = "no-cache, no-store";
+          });
+        }
+      },
       "/entitlements": "http://localhost:8787",
       "/usage": "http://localhost:8787",
       "/billing": "http://localhost:8787",

@@ -43,7 +43,7 @@ export function buildMemoryContext(m: UserMemory): string {
   if (m.language) parts.push(`Предпочтительный язык общения: ${m.language}`);
   if (m.additionalContext) parts.push(`Дополнительный контекст: ${m.additionalContext}`);
   if (parts.length === 0) return "";
-  return "[КОНТЕКСТ О ПОЛЬЗОВАТЕЛЕ]\n" + parts.join("\n");
+  return "[КОНТЕКСТ О ПОЛЬЗОВАТЕЛЕ — ОБЯЗАТЕЛЬНО ИСПОЛЬЗУЙ ДЛЯ ВОПРОСОВ О ПОЛЬЗОВАТЕЛЕ]\n" + parts.join("\n");
 }
 
 export function useMemory() {
