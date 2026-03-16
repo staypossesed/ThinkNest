@@ -10,11 +10,10 @@ Desktop и веб-приложение с 4 AI-агентами (Strategist, Ske
 | Обновить и запустить сайт | [README.md#обновление-и-запуск-веб-сайта](#обновление-и-запуск-веб-сайта) |
 | Деплой на сервер (production) | [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) |
 | Timeweb (CPU-only, быстрый) | [DEPLOY_TIMEWEB_QUICK.md](./DEPLOY_TIMEWEB_QUICK.md) |
-| План деплоя, чеклист | [DEPLOY_PLAN.md](./DEPLOY_PLAN.md) |
 | Web-режим, ngrok | [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md) |
 | Stripe, подписки | [STRIPE_SETUP.md](./STRIPE_SETUP.md) |
 | Проверка оплаты | [docs/BILLING_VERIFY.md](./docs/BILLING_VERIFY.md) |
-| Исправление смешения языков | [FIX_LANGUAGE_MIXING.md](./FIX_LANGUAGE_MIXING.md) |
+| Исправление смешения языков | [docs/FIX_LANGUAGE_MIXING.md](./docs/FIX_LANGUAGE_MIXING.md) |
 
 ## Стек
 
@@ -306,7 +305,7 @@ npm run test:ask-api   # Интеграция: /health, /ask (нужен backend
 | [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md) | Web-режим, ngrok |
 | [STRIPE_SETUP.md](./STRIPE_SETUP.md) | Stripe, подписки |
 | [docs/BILLING_VERIFY.md](./docs/BILLING_VERIFY.md) | Проверка оплаты (тесты, инструкции) |
-| [PUBLISHING.md](./PUBLISHING.md) | Публикация репо |
+| [docs/PUBLISHING.md](./docs/PUBLISHING.md) | Публикация репо |
 
 ---
 
