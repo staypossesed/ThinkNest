@@ -102,17 +102,16 @@ body {
   display: none;
 }
 
-/* Input chips — гибкая ширина, одна строка без горизонтального скролла */
+/* Input chips — равная ширина, одна строка, единый размер текста */
 .input-chip {
   flex: 1 1 0;
   min-width: 0;
-  max-width: 118px;
   height: 36px !important;
-  padding: 0 10px !important;
+  padding: 0 12px !important;
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   font-size: 12px !important;
   font-weight: 500;
   border-radius: 9999px;
@@ -123,9 +122,9 @@ body {
   transition: transform 0.12s ease-out, background-color 0.15s ease, border-color 0.15s ease;
 }
 .input-chip.input-chip--icon-only {
-  flex: 0 0 40px;
-  min-width: 40px;
-  max-width: 40px;
+  flex: 0 0 36px;
+  min-width: 36px;
+  max-width: 36px;
 }
 .input-chip:hover:not(:disabled) {
   transform: scale(1.15);

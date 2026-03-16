@@ -167,14 +167,14 @@ export default function MessageInput(props: MessageInputProps) {
 
   return (
     <div className="mx-auto max-w-3xl px-4 pb-8 pt-2">
-      <div className="flex flex-nowrap items-center gap-2 mb-4 overflow-visible py-2">
+      <div className="flex flex-nowrap items-center gap-2 mb-4 overflow-x-auto py-2">
         <label
           className={`input-chip cursor-pointer border backdrop-blur-xl transition-colors duration-200 ${
             !canUseWebData
               ? "cursor-not-allowed border-white/10 bg-white/5 opacity-50"
               : useWebData
                 ? "border-purple-500/40 bg-purple-500/15 text-purple-300"
-                : "border-white/15 bg-white/[0.07] text-gray-400 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
+                : "border-white/20 bg-white/[0.08] text-gray-300 hover:border-white/30 hover:bg-white/12 hover:text-white"
           }`}
           title={!canUseWebData ? t(uiLocale, "featureProOnly") : t(uiLocale, "useWebData")}
         >
@@ -194,7 +194,7 @@ export default function MessageInput(props: MessageInputProps) {
               ? "cursor-not-allowed border-white/10 bg-white/5 opacity-50"
               : forecastMode
                 ? "border-purple-500/40 bg-purple-500/15 text-purple-300"
-                : "border-white/15 bg-white/[0.07] text-gray-400 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
+                : "border-white/20 bg-white/[0.08] text-gray-300 hover:border-white/30 hover:bg-white/12 hover:text-white"
           }`}
           title={!canUseForecast ? t(uiLocale, "featureProOnly") : undefined}
         >
@@ -212,7 +212,7 @@ export default function MessageInput(props: MessageInputProps) {
           className={`input-chip cursor-pointer border backdrop-blur-xl transition-colors duration-200 ${
             deepResearchMode
               ? "border-purple-500/40 bg-purple-500/15 text-purple-300"
-              : "border-white/15 bg-white/[0.07] text-gray-400 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
+              : "border-white/20 bg-white/[0.08] text-gray-300 hover:border-white/30 hover:bg-white/12 hover:text-white"
           }`}
           title={t(uiLocale, "deepResearch")}
         >
@@ -239,7 +239,7 @@ export default function MessageInput(props: MessageInputProps) {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={loading || disabled || images.length >= MAX_IMAGES}
-          className="input-chip border border-white/15 bg-white/[0.07] text-gray-400 backdrop-blur-xl transition-colors duration-200 hover:border-white/25 hover:bg-white/12 hover:text-gray-300 disabled:opacity-50"
+          className="input-chip border border-white/20 bg-white/[0.08] text-gray-300 backdrop-blur-xl transition-colors duration-200 hover:border-white/30 hover:bg-white/12 hover:text-white disabled:opacity-50"
           title={t(uiLocale, "attachImage")}
         >
           <ImageIcon className="input-chip-icon" />
@@ -249,7 +249,7 @@ export default function MessageInput(props: MessageInputProps) {
           <button
             type="button"
             onClick={onOpenMemory}
-            className="input-chip input-chip--icon-only border border-white/15 bg-white/[0.07] text-gray-400 backdrop-blur-xl transition-colors duration-200 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
+            className="input-chip input-chip--icon-only border border-white/20 bg-white/[0.08] text-gray-300 backdrop-blur-xl transition-colors duration-200 hover:border-white/30 hover:bg-white/12 hover:text-white"
             title={uiLocale === "ru" ? "Личная память" : "Memory"}
           >
             <Brain className="input-chip-icon" />
@@ -265,7 +265,7 @@ export default function MessageInput(props: MessageInputProps) {
                 ? "cursor-not-allowed border-white/10 bg-white/5 opacity-50 text-gray-400"
                 : expertProfile
                   ? "border-purple-500/40 bg-purple-500/15 text-purple-300"
-                  : "border-white/15 bg-white/[0.07] text-gray-400 hover:border-white/25 hover:bg-white/12 hover:text-gray-300"
+                  : "border-white/20 bg-white/[0.08] text-gray-300 hover:border-white/30 hover:bg-white/12 hover:text-white"
             }`}
             title={!canUseExpertProfile ? t(uiLocale, "featureProOnly") : "Expert"}
           >
@@ -280,7 +280,7 @@ export default function MessageInput(props: MessageInputProps) {
           className={`input-chip input-chip--icon-only cursor-pointer border backdrop-blur-xl transition-colors duration-200 ${
             listening
               ? "border-red-500/40 bg-red-500/15 text-red-400 animate-pulse"
-              : "border-white/15 bg-white/[0.07] text-gray-400 hover:border-white/25 hover:bg-white/12 hover:text-gray-300 disabled:opacity-50"
+              : "border-white/20 bg-white/[0.08] text-gray-300 hover:border-white/30 hover:bg-white/12 hover:text-white disabled:opacity-50"
           }`}
           title={
             sttLoading
@@ -345,7 +345,7 @@ export default function MessageInput(props: MessageInputProps) {
           }}
           placeholder={placeholderText}
           rows={1}
-          disabled={disabled || loading}
+          disabled={disabled}
           className="input-textarea min-h-[44px] max-h-[200px] flex-1 resize-none overflow-y-auto rounded-xl border-0 bg-transparent px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-0"
         />
         {loading ? (
@@ -372,7 +372,7 @@ export default function MessageInput(props: MessageInputProps) {
       </div>
 
       {(error || sttError) && (
-        <div className="mt-2 text-sm text-red-400">{error || sttError}</div>
+        <div className="mt-2 text-sm text-purple-400">{error || sttError}</div>
       )}
 
       <p className="mt-4 text-[11px] leading-relaxed text-gray-500/80">

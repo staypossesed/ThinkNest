@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Copy, Check, ThumbsUp, ThumbsDown } from "lucide-react";
@@ -32,7 +32,7 @@ interface AgentCardProps {
   isActive?: boolean;
 }
 
-export default function AgentCard({ answer, uiLocale, streamingContent, isStreaming, isActive }: AgentCardProps) {
+function AgentCard({ answer, uiLocale, streamingContent, isStreaming, isActive }: AgentCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const display = AGENT_DISPLAY[answer.id] ?? { name: answer.title, emoji: "🤖", color: "purple" };
@@ -113,7 +113,13 @@ export default function AgentCard({ answer, uiLocale, streamingContent, isStream
       {(expanded || isStreaming) && (
         <div className="mt-4 border-t border-white/10 pt-4">
           <div className="scrollbar-chat max-h-[280px] overflow-y-auto text-sm leading-relaxed text-gray-300 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:my-2 [&_ol]:my-2 [&_code]:rounded [&_code]:bg-white/10 [&_code]:px-1 [&_pre]:overflow-x-auto [&_a]:text-purple-400 [&_a]:underline">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayContent}</ReactMarkdown>
+            {isStreaming ? (
+              <pre className="whitespace-pre-wrap font-sans text-sm [&_p]:mb-2 [&_p]:last-child:mb-0">
+                {displayContent}
+              </pre>
+            ) : (
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayContent}</ReactMarkdown>
+            )}
           </div>
           {isStreaming && (
             <span className="ml-1 inline-block h-4 w-0.5 animate-pulse bg-purple-400" />
@@ -123,3 +129,5 @@ export default function AgentCard({ answer, uiLocale, streamingContent, isStream
     </div>
   );
 }
+
+export default memo(AgentCard);

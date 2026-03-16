@@ -41,11 +41,11 @@ export const translations: Record<
     plannerResponds: "Планировщик отвечает...",
     agentResponds: "отвечает...",
     submit: "Отправить",
-    useWebData: "Use Web Data",
-    useWebDataShort: "Web",
+    useWebData: "Поиск в интернете",
+    useWebDataShort: "Интернет",
     forecast: "Прогноз",
-    deepResearch: "Deep Research",
-    deepResearchShort: "Research",
+    deepResearch: "Режим мульти-ответа",
+    deepResearchShort: "Мульти-ответ",
     attachImage: "Прикрепить картинку",
     image: "Картинка",
     sources: "Источники",
@@ -76,7 +76,11 @@ export const translations: Record<
     thumbsUp: "Нравится",
     thumbsDown: "Не нравится",
     finalAnswerSection: "Итоговый ответ",
-    copy: "Копировать"
+    copy: "Копировать",
+    checkoutSuccessTitle: "Оплата прошла успешно",
+    checkoutSuccessLoggedIn: "Ваш план Pro активирован. Обновите страницу или вернитесь в приложение.",
+    checkoutSuccessNotLoggedIn: "Оплата прошла! Если вы использовали десктоп-приложение — вернитесь в него, и план Pro активируется. Если веб — войдите через Google.",
+    close: "Закрыть"
   },
   en: {
     newChat: "New chat",
@@ -118,8 +122,8 @@ export const translations: Record<
     useWebData: "Use Web Data",
     useWebDataShort: "Web",
     forecast: "Forecast",
-    deepResearch: "Deep Research",
-    deepResearchShort: "Research",
+    deepResearch: "Multi-answer mode",
+    deepResearchShort: "Multi-answer",
     attachImage: "Attach image",
     image: "Image",
     sources: "Sources",
@@ -150,7 +154,11 @@ export const translations: Record<
     thumbsUp: "Like",
     thumbsDown: "Dislike",
     finalAnswerSection: "Final answer",
-    copy: "Copy"
+    copy: "Copy",
+    checkoutSuccessTitle: "Payment successful",
+    checkoutSuccessLoggedIn: "Your Pro plan is now active. Refresh the page or return to the app.",
+    checkoutSuccessNotLoggedIn: "Payment successful! If you used the desktop app — return to it and your Pro plan will activate. If you used the web — sign in with Google.",
+    close: "Close"
   },
   zh: {
     newChat: "新对话",
@@ -192,8 +200,8 @@ export const translations: Record<
     useWebData: "使用网络数据",
     useWebDataShort: "网络",
     forecast: "预测",
-    deepResearch: "深度研究",
-    deepResearchShort: "研究",
+    deepResearch: "多答案模式",
+    deepResearchShort: "多答案",
     attachImage: "附加图片",
     image: "图片",
     sources: "来源",
@@ -224,7 +232,11 @@ export const translations: Record<
     thumbsUp: "赞",
     thumbsDown: "踩",
     finalAnswerSection: "最终回答",
-    copy: "复制"
+    copy: "复制",
+    checkoutSuccessTitle: "支付成功",
+    checkoutSuccessLoggedIn: "您的 Pro 计划已激活。刷新页面或返回应用。",
+    checkoutSuccessNotLoggedIn: "支付成功！如使用桌面应用，请返回应用以激活 Pro。如使用网页版，请通过 Google 登录。",
+    close: "关闭"
   }
 };
 
