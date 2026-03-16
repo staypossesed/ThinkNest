@@ -76,7 +76,6 @@ ThinkNest — десктопное приложение с 4 AI-агентами
 ollama pull llama3.1:8b
 ollama pull qwen2.5:7b
    ```
-
    Опционально для картинок: `ollama pull llava`
 
 4. **Запуск:**
