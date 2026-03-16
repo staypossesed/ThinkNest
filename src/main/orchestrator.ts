@@ -393,7 +393,6 @@ export async function askQuestion(
     throw new Error("Вопрос пустой.");
   }
   await checkOllamaAvailable(ollamaConfig.baseUrl);
-  preloadModel(ollamaConfig.baseUrl, "llama3.2:3b", 12000).catch(() => {});
   const mode = request.mode ?? "balanced";
   const modeModels = getModelsForMode(mode);
   type AnswerLang = "ru" | "en" | "zh";
@@ -467,10 +466,10 @@ export async function askQuestion(
   const isFactualMode = webContext && !forecastMode;
   const getLanguageInstruction = (lang: AnswerLang) =>
     lang === "ru"
-      ? "\n\n[ЯЗЫК — КРИТИЧНО] Весь ответ ТОЛЬКО на русском. Запрещено переключаться на английский или другие языки."
+      ? "\n\n[ЯЗЫК — КРИТИЧНО] Весь ответ СТРОГО на русском. Запрещено использовать английский, китайский или другие языки."
       : lang === "zh"
-        ? "\n\n[语言 — 必须] 请严格使用简体中文回答。禁止切换到其他语言。"
-        : "\n\n[LANGUAGE — CRITICAL] Reply ONLY in English. Do not switch to Russian or other languages.";
+        ? "\n\n[语言 — 必须] 请严格使用简体中文回答。禁止使用俄文、英文或其他语言。"
+        : "\n\n[LANGUAGE — CRITICAL] Your ENTIRE response MUST be in English ONLY. FORBIDDEN: Russian, Chinese, or any other language. Write exclusively in English.";
   const webInstruction = webContext
     ? isFactualMode
       ? "\n\n[ФАКТИЧЕСКИЙ РЕЖИМ] В сообщении пользователя есть блок «ИСТОЧНИКИ ИЗ ИНТЕРНЕТА». " +
@@ -548,6 +547,8 @@ export async function askQuestion(
       SYSTEM_PREFIX +
       "\n\n" +
       agent.systemPrompt +
+      getLanguageInstruction(lang) +
+      getFocusInstruction(lang) +
       getCommonSenseInstruction(lang) +
       memoryInstruction +
       expertInstruction +
@@ -580,9 +581,12 @@ export async function askQuestion(
   const hasImages = (request.images?.filter((s) => s?.startsWith("data:image/")) ?? []).length > 0;
   const useSingleAgentForSimple =
     complexity === "simple" && !effectiveUseWebData && !hasImages;
-  const maxAgents = useSingleAgentForSimple
-    ? 1
-    : Math.max(1, Math.min(4, request.maxAgents ?? 4));
+  // Обычный режим: всегда 1 ответ. Deep research: простой=1, сложный=2 (free) или 4 (pro)
+  const maxAgents = deepResearchMode
+    ? useSingleAgentForSimple
+      ? 1
+      : Math.max(1, Math.min(4, request.maxAgents ?? 4))
+    : 1;
   const activeAgents = useSingleAgentForSimple
     ? agentProfiles.filter((a) => a.id === "explainer")
     : agentProfiles.slice(0, maxAgents);
@@ -675,12 +679,21 @@ export async function askQuestion(
             ? "[用户图片——描述如下]\n结合图片回答问题：\n\n"
             : "[USER IMAGE — DESCRIPTION BELOW]\nAnswer the question TAKING INTO ACCOUNT this image:\n\n")
       : "";
+  const questionLabel =
+    getAnswerLang() === "ru" ? "Вопрос" : getAnswerLang() === "zh" ? "问题" : "Question";
+  const langSuffix =
+    getAnswerLang() === "ru"
+      ? "\n\n[Ответ СТРОГО на русском.]"
+      : getAnswerLang() === "zh"
+        ? "\n\n[请严格使用中文回答。]"
+        : "\n\n[Reply in English ONLY.]";
   const userContent =
     imageWithQuestionPrefix +
     (imageContext || "") +
     (webContext ? `${webContext}\n\n---\n` : "") +
     `${currentContext}\n\n` +
-    (isImageOnly ? imageOnlyInstruction : `Вопрос: ${question}`);
+    (isImageOnly ? imageOnlyInstruction : `${questionLabel}: ${question}`) +
+    langSuffix;
 
   // #region agent log
   _dbg("orchestrator.ts:userContent", "content sent to agents", {
@@ -744,7 +757,7 @@ export async function askQuestion(
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       const isUserStop = getAskSignal()?.aborted && getAskSignal()?.reason === "user-stop";
-      const fallbackModel = modeModels.imageFast || "llama3.2:3b";
+      const fallbackModel = modeModels.imageFast || modeModels.aggregator || "llama3.2:3b";
 
       // Если пользователь нажал Stop — не делаем повторный запрос, возвращаем частичный ответ
       if (isUserStop) {
@@ -873,6 +886,8 @@ export async function askQuestion(
   }
 
   // Anti-hallucination & language lock + smart synthesis — updated March 2026
+  const judgeLang = getAnswerLang();
+  const judgeLanguageInstruction = getLanguageInstruction(judgeLang);
   const judgeModeHint = isFactualMode
     ? "CRITICAL: Below is a SOURCES block. Your synthesized answer must MATCH the sources. " +
       "REJECT and correct any facts from the 4 agents that are NOT in the sources (they are fabricated). "
@@ -880,9 +895,21 @@ export async function askQuestion(
       ? "For forecasts you may pick reasonable assumptions from the 4 answers. "
       : "";
   const aggSystem =
-    SYSTEM_PREFIX + "\n\n" + prompts.judgeBase + "\n\n" + judgeModeHint;
+    SYSTEM_PREFIX +
+    "\n\n" +
+    prompts.judgeBase +
+    judgeLanguageInstruction +
+    "\n\n" +
+    judgeModeHint;
 
-  const aggUserContent = buildAggregationInput(question, sanitizedAnswers, webContext);
+  const aggBase = buildAggregationInput(question, sanitizedAnswers, webContext);
+  const aggLangSuffix =
+    judgeLang === "ru"
+      ? "\n\n[Итоговый ответ СТРОГО на русском.]"
+      : judgeLang === "zh"
+        ? "\n\n[最终回答请严格使用中文。]"
+        : "\n\n[Your synthesized answer MUST be in English ONLY.]";
+  const aggUserContent = aggBase + aggLangSuffix;
 
   try {
     const judgeResponse = await chatCompletion({
