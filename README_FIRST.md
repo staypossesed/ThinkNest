@@ -25,6 +25,7 @@ ThinkNest is a desktop app with 4 AI agents (Planner, Critic, Pragmatist, Explai
 ollama pull llama3.1:8b
 ollama pull qwen2.5:7b
    ```
+   
    Optional for images: `ollama pull llava`
 
 4. **Run:**
@@ -75,6 +76,7 @@ ThinkNest — десктопное приложение с 4 AI-агентами
 ollama pull llama3.1:8b
 ollama pull qwen2.5:7b
    ```
+
    Опционально для картинок: `ollama pull llava`
 
 4. **Запуск:**
