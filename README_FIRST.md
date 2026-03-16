@@ -20,12 +20,6 @@ ThinkNest is a desktop app with 4 AI agents (Planner, Critic, Pragmatist, Explai
    - `backend/.env.example` → `backend/.env`
    - `.env.example` → `.env`
 
-1. **Install:**
-   ```bash
-   npm install
-   npm --prefix backend install
-   ```
-
 3. **Pull Ollama models** (one at a time):
    ```bash
 ollama pull llama3.1:8b
