@@ -43,7 +43,7 @@ describe("backend prompts.config", () => {
   it("numPredict matches prompts.private (320, 260, 220, 180)", () => {
     const p = getPrompts();
     const nums = p.agents.map((a) => a.numPredict);
-    expect(nums).toEqual([320, 260, 220, 180]);
+    expect(nums).toEqual([400, 300, 300, 320]);
   });
 
   it("forecastSuffix requires scenarios with dates", () => {

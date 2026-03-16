@@ -127,12 +127,31 @@ function stripBoilerplate(content: string): string {
     .trim();
 }
 
+/** Удаляет блоки на чужом алфавите при смешении языков (ru/en/zh) */
+function removeForeignScriptBlocks(content: string, lang: "ru" | "en" | "zh"): string {
+  let t = content;
+  const cjk = /[\u3000-\u303F\u3400-\u9FFF\uF900-\uFAFF]+/g;
+  const cyr = /[А-Яа-яЁё]+/g;
+  if (lang === "ru") {
+    t = t.replace(cjk, " ").replace(/\s*\[[^\]]*[\u4e00-\u9fff][^\]]*\]\s*/g, " ");
+  } else if (lang === "en") {
+    t = t.replace(cjk, " ").replace(cyr, " ");
+  } else {
+    t = t.replace(cyr, " ");
+  }
+  return t.replace(/\s{2,}/g, " ").trim();
+}
+
 /** Исправляет типичные ошибки моделей: неверные слова, смешение языков */
-function fixCommonNonsense(content: string): string {
-  return stripBoilerplate(content)
+function fixCommonNonsense(content: string, lang?: "ru" | "en" | "zh"): string {
+  let t = stripBoilerplate(content)
     .replace(/\bбеспечность\b/gi, "достоверность")
     .replace(/\bразработай беспечность\b/gi, "обеспечь достоверность")
     .replace(/\bmeaningful answer in the context of[^.]*\.?/gi, "");
+  if (lang && (hasForeignScriptNoise(t, lang === "zh" ? "en" : lang) || (lang === "zh" && /[А-Яа-яЁё]/.test(t)))) {
+    t = removeForeignScriptBlocks(t, lang);
+  }
+  return t;
 }
 
 async function normalizeAnswerLanguage(
@@ -140,7 +159,7 @@ async function normalizeAnswerLanguage(
   lang: "ru" | "en" | "zh",
   model: string
 ): Promise<string> {
-  let text = fixCommonNonsense(content);
+  let text = fixCommonNonsense(content, lang);
   if (!ollamaConfig.llmLanguageRewrite) {
     return text;
   }
@@ -171,7 +190,7 @@ async function normalizeAnswerLanguage(
         { role: "user", content: text }
       ]
     });
-    return fixCommonNonsense(rewritten || text);
+    return fixCommonNonsense(rewritten || text, lang);
   } catch {
     return text;
   }
@@ -406,6 +425,17 @@ async function checkOllamaAvailable(baseUrl: string): Promise<void> {
   );
 }
 
+const isSimpleGreeting = (s: string): boolean => {
+  const t = s.trim().replace(/[!?.]+$/, "").toLowerCase();
+  return t.length < 50 && /^(привет|ку|здарова|здравствуй|хай|hello|hi|hey|你好|嗨|как дела|how are you|what'?s up)\s*$/i.test(t);
+};
+
+const GREETING_RESPONSE: Record<"ru" | "en" | "zh", string> = {
+  ru: "Привет! Чем могу помочь? Задайте вопрос — отвечу с разных точек зрения.",
+  en: "Hello! How can I help? Ask a question — I'll answer from different perspectives.",
+  zh: "你好！有什么可以帮您？提出问题，我会从不同角度回答。"
+};
+
 export async function askQuestion(
   request: AskRequest,
   onAgentAnswer?: OnAgentAnswer,
@@ -414,6 +444,26 @@ export async function askQuestion(
   const question = request.question.trim();
   if (!question) {
     throw new Error("Вопрос пустой.");
+  }
+
+  // Ранний выход для приветствий — без вызова моделей, мгновенный ответ
+  if (isSimpleGreeting(question)) {
+    const loc = getAskLocale() ?? request.preferredLocale;
+    const lang = (loc === "ru" || loc === "en" || loc === "zh") ? loc : detectQuestionLanguage(question) === "ru" ? "ru" : "en";
+    const content = GREETING_RESPONSE[lang];
+    const answer: AgentAnswer = {
+      id: "explainer",
+      title: "Объяснитель",
+      content,
+      model: "greeting",
+      durationMs: 0
+    };
+    onAgentAnswer?.(answer);
+    return {
+      answers: [answer],
+      final: { content, model: "greeting", durationMs: 0 },
+      webSources: null
+    };
   }
 
   await checkOllamaAvailable(ollamaConfig.baseUrl);
@@ -507,7 +557,9 @@ export async function askQuestion(
         "Если есть — цитируй дословно или перефразируй строго по смыслу источника. Никаких «возможно», «вероятно» без цитаты. " +
         "ИСКЛЮЧЕНИЕ: вопросы о пользователе (имя, роль, интересы) — блок [КОНТЕКСТ О ПОЛЬЗОВАТЕЛЕ]."
       : "\n\n[РЕЖИМ ПРОГНОЗА] Делай вероятностный прогноз по веб-данным и контексту. " +
-        "Укажи сценарии (бычий/базовый/медвежий), диапазон значений, вероятности и факторы риска."
+        "Укажи сценарии (бычий/базовый/медвежий), диапазон значений, вероятности и факторы риска. " +
+        "КРИТИЧНО: Если в источниках нет ответа — используй свои знания, пометь «по моим знаниям» или «предположение». " +
+        "ЗАПРЕЩЕНО отказываться, писать «нет информации», «в источниках не указано». Всегда дай полезный ответ."
     : forecastMode
       ? "\n\n[РЕЖИМ ПРОГНОЗА] Можно давать допущения, но помечай их как предположение."
       : "\n\n[НЕТ ВЕБ-ИСТОЧНИКОВ] Используй свои знания. Дай умный, полезный ответ. " +
@@ -721,10 +773,10 @@ export async function askQuestion(
   const chatHistory = request.chatHistory ?? [];
   const chatHistoryLabel =
     getAnswerLang() === "ru"
-      ? "[ДИАЛОГ НИЖЕ — ОБЯЗАТЕЛЬНО УЧИТЫВАЙ]. Пользователь продолжает разговор. ОТВЕЧАЙ на ПОСЛЕДНИЙ вопрос, опираясь на контекст. Пойми намерение: продолжение, уточнение, новый вопрос. НЕ повторяй приветствия. НЕ копируй предыдущий ответ. Только по сути."
+      ? "[ПРЕДЫДУЩИЙ ДИАЛОГ — ТОЛЬКО КОНТЕКСТ]. НЕ копируй предыдущий ответ. Твой ответ — ТОЛЬКО на текущий вопрос ниже."
       : getAnswerLang() === "zh"
-        ? "[下方对话—必须考虑]。用户继续对话。根据上下文回答最后一个问题。理解意图：延续、澄清、新问题。不要重复问候，不要复制上一回答。只答实质。"
-        : "[DIALOGUE BELOW — MUST USE]. User continues the conversation. ANSWER the LAST question using context. Understand intent: follow-up, clarification, new question. Don't repeat greetings. Don't copy previous answer. Substance only.";
+        ? "[上文对话—仅作参考]。不要复制上一回答。你的回答只针对下面的当前问题。"
+        : "[PREVIOUS DIALOGUE — CONTEXT ONLY]. Do NOT copy the previous answer. Your answer is ONLY for the current question below.";
   const answerLabel = getAnswerLang() === "ru" ? "Ответ" : getAnswerLang() === "zh" ? "回答" : "Answer";
   const chatHistoryContext =
     chatHistory.length > 0
@@ -736,6 +788,12 @@ export async function askQuestion(
           .join("\n\n---\n\n") +
         "\n\n---"
       : "";
+  const currentQuestionBlock =
+    getAnswerLang() === "ru"
+      ? `[ТЕКУЩИЙ ВОПРОС — ОТВЕЧАЙ ТОЛЬКО НА НЕГО]\n${questionLabel}: ${question}`
+      : getAnswerLang() === "zh"
+        ? `[当前问题—只回答此问题]\n${questionLabel}: ${question}`
+        : `[CURRENT QUESTION — ANSWER ONLY THIS]\n${questionLabel}: ${question}`;
   const noMetaSuffix =
     getAnswerLang() === "ru"
       ? "\n\n[ФОРМАТ] Пиши ТОЛЬКО сам ответ. ЗАПРЕЩЕНО выводить «[ПРЕДЫДУЩИЙ ДИАЛОГ]», «Вопрос:», «Ответ:» или другие метки — только суть."
@@ -748,7 +806,7 @@ export async function askQuestion(
     (webContext ? `${webContext}\n\n---\n` : "") +
     (chatHistoryContext ? `${chatHistoryContext}\n\n` : "") +
     `${currentContext}\n\n` +
-    (isImageOnly ? imageOnlyInstruction : `${questionLabel}: ${question}`) +
+    (isImageOnly ? imageOnlyInstruction : currentQuestionBlock) +
     (chatHistoryContext ? noMetaSuffix : "") +
     langSuffix;
 
@@ -909,7 +967,7 @@ export async function askQuestion(
     const t = s.trim().replace(/[!?.]+$/, "").toLowerCase();
     return t.length < 35 && /^(привет|ку|здарова|здравствуй|хай|hello|hi|hey|你好|嗨)\s*$/i.test(t);
   };
-  const REFUSAL_PHRASES = /не могу ответить|не могу сформировать ответ|без конкретики|задайте более точный|переформулировать вопрос|cannot answer|can'?t answer|отказаться|i cannot answer|я не могу ответить/i;
+  const REFUSAL_PHRASES = /не могу ответить|не могу сформировать ответ|без конкретики|задайте более точный|переформулировать вопрос|cannot answer|can'?t answer|отказаться|i cannot answer|я не могу ответить|нет информации о том|в источниках не указано|в найденных источниках не указано|no information (?:about|on)|not (?:found|specified) in (?:the )?sources/i;
   const GREETING_ECHO = /^(ку|привет|ку,|привет,|здарова|хай|hello|hi)\s*,?\s*/i;
   const isRefusalAnswer = (s: string): boolean => REFUSAL_PHRASES.test(s);
   const isGreetingEchoRefusal = (s: string): boolean =>
@@ -937,10 +995,20 @@ export async function askQuestion(
   const isRepeatOfPrevious = (content: string): boolean => {
     const last = chatHistory[chatHistory.length - 1]?.answer;
     if (!last || content.length < 15) return false;
-    const n = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "").slice(0, 80);
+    const n = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
     const a = n(content);
     const b = n(last);
     if (a.length < 20) return false;
+    const a80 = a.slice(0, 80);
+    const b80 = b.slice(0, 80);
+    if (a80 === b80) return true;
+    if (a.length > 25 && b.length > 25) {
+      const overlap = Math.min(a.length, b.length, 60);
+      const aStart = a.slice(0, overlap);
+      const bStart = b.slice(0, overlap);
+      if (aStart === bStart) return true;
+      if (a.includes(b80) || b.includes(a80)) return true;
+    }
     return a === b || (a.length > 30 && b.includes(a)) || (b.length > 30 && a.includes(b));
   };
   const greetingFallback = (lang: "ru" | "en" | "zh"): string =>
@@ -970,7 +1038,8 @@ export async function askQuestion(
       return { ...a, content: greetingFallback(getAnswerLang()), model: `${a.model} (echo-refusal-filtered)` };
     }
     if (isRefusalAnswer(a.content)) {
-      return { ...a, content: badAnswerFallback(getAnswerLang()), model: `${a.model} (refusal-filtered)` };
+      const fallback = buildHardFallback(a.id, getAnswerLang(), question, forecastMode, deepResearchMode);
+      return { ...a, content: fallback, model: `${a.model} (refusal-filtered)` };
     }
     if (isGarbledText(a.content)) {
       return { ...a, content: badAnswerFallback(getAnswerLang()), model: `${a.model} (garbled-filtered)` };
@@ -979,7 +1048,8 @@ export async function askQuestion(
       return { ...a, content: badAnswerFallback(getAnswerLang()), model: `${a.model} (nonsense-filtered)` };
     }
     if (isRepeatOfPrevious(a.content)) {
-      return { ...a, content: badAnswerFallback(getAnswerLang()), model: `${a.model} (repeat-filtered)` };
+      const fallback = buildHardFallback(a.id, getAnswerLang(), question, forecastMode, deepResearchMode);
+      return { ...a, content: fallback, model: `${a.model} (repeat-filtered)` };
     }
     return a;
   });
@@ -1027,7 +1097,8 @@ export async function askQuestion(
     ? "CRITICAL: SOURCES block below. Your answer MUST be 100% from sources. " +
       "REJECT any agent claim NOT in sources — it is fabricated. If no source has the answer — write ONLY «В найденных источниках не указано.» No guessing. "
     : forecastMode
-      ? "For forecasts you may pick reasonable assumptions from the 4 answers. "
+      ? "For forecasts you may pick reasonable assumptions from the 4 answers. " +
+        "If agents refused or sources are empty — use your knowledge, give a forecast, mark «по моим знаниям». NEVER refuse."
       : "";
   const aggSystem =
     SYSTEM_PREFIX +
@@ -1062,7 +1133,7 @@ export async function askQuestion(
       ]
     });
 
-    let synthesizedContent = judgeResponse.trim();
+    let synthesizedContent = fixCommonNonsense(judgeResponse.trim(), judgeLang);
     const finalDuration = Math.round(performance.now() - aggStart);
     const fallbackWinner = sanitizedAnswers.find((a) => !a.content.startsWith("Agent error:")) ?? sanitizedAnswers[0];
     if (isGreetingOrJunk(synthesizedContent)) {

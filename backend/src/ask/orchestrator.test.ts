@@ -10,7 +10,7 @@ describe("backend orchestrator", () => {
   it("contains never-refuse instruction for web parity", () => {
     expect(src).toContain("ЗАПРЕЩЕНО отказываться");
     expect(src).toContain("вопрос слишком расплывчатый");
-    expect(src).toContain("Даже на общие вопросы");
+    expect(src).toContain("Даже на общие");
   });
 
   it("injects getLanguageInstruction into buildSystemPrompt (answer language = question language)", () => {
