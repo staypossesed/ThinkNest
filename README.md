@@ -9,6 +9,7 @@ Desktop и веб-приложение с 4 AI-агентами (Strategist, Ske
 | Быстрый старт (5 мин) | [README_FIRST.md](./README_FIRST.md) |
 | Обновить и запустить сайт | [README.md#обновление-и-запуск-веб-сайта](#обновление-и-запуск-веб-сайта) |
 | Деплой на сервер (production) | [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) |
+| Timeweb (CPU-only, быстрый) | [DEPLOY_TIMEWEB_QUICK.md](./DEPLOY_TIMEWEB_QUICK.md) |
 | План деплоя, чеклист | [DEPLOY_PLAN.md](./DEPLOY_PLAN.md) |
 | Web-режим, ngrok | [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md) |
 | Stripe, подписки | [STRIPE_SETUP.md](./STRIPE_SETUP.md) |
