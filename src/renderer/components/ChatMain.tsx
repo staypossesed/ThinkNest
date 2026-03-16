@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { AgentId, ConversationMessage } from "../../shared/types";
+import type { AgentId, ConversationMessage, Entitlements } from "../../shared/types";
 import type { UiLocale } from "./LanguageSelector";
 import AgentCard from "./AgentCard";
 import FinalAnswer from "./FinalAnswer";
@@ -8,10 +8,14 @@ import { t } from "../i18n";
 
 const agentOrder: AgentId[] = ["planner", "critic", "pragmatist", "explainer"];
 
+function getEffectiveMaxAgents(msg: ConversationMessage, entitlements: Entitlements | null): number {
+  return msg.deepResearchMode ? (entitlements?.maxAgents ?? 2) : 1;
+}
+
 interface ChatMainProps {
   messages: ConversationMessage[];
   loading: boolean;
-  maxAgents: number;
+  entitlements: Entitlements | null;
   scrollToBottom?: boolean;
   uiLocale: UiLocale;
   streamingTokens?: Record<string, string>;
@@ -28,7 +32,7 @@ function getActiveStreamingAgent(streamingTokens: Record<string, string>): Agent
 export default function ChatMain({
   messages,
   loading,
-  maxAgents,
+  entitlements,
   scrollToBottom = true,
   uiLocale,
   streamingTokens = {}
@@ -79,11 +83,15 @@ export default function ChatMain({
 
             {/* AI block */}
             <div className="animate-card-in rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-              <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                {t(uiLocale, "perspectivesHeader")}
-              </p>
+              {msg.deepResearchMode && (
+                <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  {t(uiLocale, "perspectivesHeaderN", {
+                    n: getEffectiveMaxAgents(msg, entitlements)
+                  })}
+                </p>
+              )}
               <div className="flex flex-col gap-3">
-                {agentOrder.slice(0, maxAgents).map((agentId) => {
+                {agentOrder.slice(0, getEffectiveMaxAgents(msg, entitlements)).map((agentId) => {
                   const answer = msg.answers.find((a) => a.id === agentId);
                   const isLastMsg = msg === messages[messages.length - 1];
                   const streamContent = isLastMsg ? streamingTokens[agentId] : undefined;
@@ -134,11 +142,12 @@ export default function ChatMain({
                   uiLocale={uiLocale}
                   question={msg.question}
                   answers={msg.answers}
+                  perspectivesCount={msg.deepResearchMode ? getEffectiveMaxAgents(msg, entitlements) : 1}
                 />
               ) : (
                 msg === messages[messages.length - 1] &&
                 loading &&
-                msg.answers.length >= maxAgents && (
+                msg.answers.length >= getEffectiveMaxAgents(msg, entitlements) && (
                   <div className="mt-4 flex items-center gap-2 rounded-xl bg-purple-500/10 px-4 py-3 text-sm text-purple-300">
                     <span className="h-2 w-2 animate-pulse rounded-full bg-purple-400" />
                     {t(uiLocale, "formingResult")}
