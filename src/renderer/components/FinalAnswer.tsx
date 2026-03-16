@@ -13,6 +13,7 @@ interface FinalAnswerProps {
   uiLocale: UiLocale;
   question?: string;
   answers?: AgentAnswer[];
+  perspectivesCount?: number;
 }
 
 function getJudgeSummary(content: string, maxLen = 200): string {
@@ -29,7 +30,14 @@ function getJudgeSummary(content: string, maxLen = 200): string {
   return summary.length <= maxLen ? summary : summary.slice(0, maxLen) + "…";
 }
 
-export default function FinalAnswer({ final, webSources, uiLocale, question = "", answers = [] }: FinalAnswerProps) {
+export default function FinalAnswer({
+  final,
+  webSources,
+  uiLocale,
+  question = "",
+  answers = [],
+  perspectivesCount = 1
+}: FinalAnswerProps) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const summary = getJudgeSummary(final.content);
@@ -52,9 +60,16 @@ export default function FinalAnswer({ final, webSources, uiLocale, question = ""
     >
       <div className="mb-4">
         <h3 className="text-xl font-bold tracking-tight text-white">
-          <span className="text-purple-400">FINAL</span> CONCLUSION
+          <span className="text-purple-400">{t(uiLocale, "finalConclusion1")}</span>{" "}
+          {t(uiLocale, "finalConclusion2")}
         </h3>
-        <p className="mt-1 text-sm text-gray-400">Synthesized from all 4 perspectives</p>
+        {perspectivesCount > 1 && (
+          <p className="mt-1 text-sm text-gray-400">
+            {perspectivesCount === 2
+              ? t(uiLocale, "synthesizedFrom2")
+              : t(uiLocale, "synthesizedFrom4")}
+          </p>
+        )}
       </div>
 
       <div className="flex items-start justify-between gap-4">
@@ -77,14 +92,14 @@ export default function FinalAnswer({ final, webSources, uiLocale, question = ""
           <button
             type="button"
             className="rounded-lg p-2.5 text-gray-400 transition-colors hover:bg-white/10 hover:text-green-400"
-            title="Thumbs up"
+            title={t(uiLocale, "thumbsUp")}
           >
             <ThumbsUp className="h-5 w-5" />
           </button>
           <button
             type="button"
             className="rounded-lg p-2.5 text-gray-400 transition-colors hover:bg-white/10 hover:text-red-400"
-            title="Thumbs down"
+            title={t(uiLocale, "thumbsDown")}
           >
             <ThumbsDown className="h-5 w-5" />
           </button>
