@@ -13,6 +13,7 @@ interface ChatSidebarProps {
   onSelect: (id: string | null) => void;
   onNewChat: () => void;
   onDelete: (id: string) => void;
+  onRename: (id: string, title: string) => void;
   session: SessionState;
   entitlements: Entitlements | null;
   devMode: boolean;
@@ -50,12 +51,18 @@ function getPreview(question: string, maxLen = 40): string {
   return t.length <= maxLen ? t : t.slice(0, maxLen) + "…";
 }
 
+function getDisplayTitle(c: Conversation, fallback: string): string {
+  if (c.title?.trim()) return getPreview(c.title.trim(), 50);
+  return getPreview(c.messages[0]?.question ?? fallback);
+}
+
 export default function ChatSidebar({
   conversations,
   activeId,
   onSelect,
   onNewChat,
   onDelete,
+  onRename,
   session,
   entitlements,
   devMode,
@@ -72,6 +79,8 @@ export default function ChatSidebar({
   subscription = null
 }: ChatSidebarProps) {
   const [deleteModal, setDeleteModal] = useState<{ id: string } | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 768);
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");
@@ -168,9 +177,42 @@ export default function ChatSidebar({
             }}
           >
             <div className="min-w-0 flex-1">
-              <span className="block truncate text-sm text-white">
-                {getPreview(c.messages[0]?.question ?? t(uiLocale, "newChat"))}
-              </span>
+              {editingId === c.id ? (
+                <input
+                  type="text"
+                  value={editDraft}
+                  onChange={(e) => setEditDraft(e.target.value)}
+                  onBlur={() => {
+                    onRename(c.id, editDraft);
+                    setEditingId(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      onRename(c.id, editDraft);
+                      setEditingId(null);
+                    }
+                    if (e.key === "Escape") {
+                      setEditingId(null);
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full truncate rounded bg-white/10 px-2 py-0.5 text-sm text-white outline-none focus:ring-1 focus:ring-purple-500"
+                  autoFocus
+                />
+              ) : (
+                <span
+                  className="block cursor-pointer truncate text-sm text-white hover:text-purple-300"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditDraft(c.title ?? c.messages[0]?.question ?? "");
+                    setEditingId(c.id);
+                  }}
+                  title={uiLocale === "ru" ? "Нажмите, чтобы переименовать" : uiLocale === "zh" ? "点击重命名" : "Click to rename"}
+                >
+                  {getDisplayTitle(c, t(uiLocale, "newChat"))}
+                </span>
+              )}
               <span className="text-xs text-gray-500">{formatDate(c.updatedAt, uiLocale)}</span>
             </div>
             <button
@@ -196,7 +238,7 @@ export default function ChatSidebar({
             </p>
             {entitlements && (
               <p className="text-xs text-gray-500">
-                {entitlements.usedQuestions}/{entitlements.maxQuestions}
+                Обычный: ∞ · Мульти: {entitlements.usedMultiAnswer ?? 0}/{entitlements.maxMultiAnswer ?? 100}
               </p>
             )}
             {entitlements?.plan === "pro" && (

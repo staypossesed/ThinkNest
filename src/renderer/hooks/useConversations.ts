@@ -203,6 +203,18 @@ export function useConversations(devMode: boolean) {
     [activeId, persistWithLatest]
   );
 
+  const updateConversationTitle = useCallback(
+    (convId: string, title: string) => {
+      const trimmed = title.trim();
+      persistWithLatest((prev) =>
+        prev.map((c) =>
+          c.id === convId ? { ...c, title: trimmed || undefined, updatedAt: Date.now() } : c
+        )
+      );
+    },
+    [persistWithLatest]
+  );
+
   const newChat = useCallback(() => {
     return createConversation();
   }, [createConversation]);
@@ -217,6 +229,7 @@ export function useConversations(devMode: boolean) {
     updateMessage,
     selectConversation,
     deleteConversation,
+    updateConversationTitle,
     newChat
   };
 }
