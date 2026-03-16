@@ -170,23 +170,47 @@ export async function webOpenPortal(): Promise<void> {
   }
 }
 
+const ASK_RETRIES = 3;
+const ASK_RETRY_DELAY_MS = 500;
+
 export async function webAsk(
   payload: AskRequest,
   onAnswer?: (answer: AgentAnswer) => void
 ): Promise<AskResponse> {
   debug("webBackend", "ask", { question: payload.question?.slice(0, 50), hasToken: !!getToken() });
-  try {
-    const res = await request<AskResponse>("/ask", {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
-    debug("webBackend", "ask success", { answersCount: res.answers?.length, hasFinal: !!res.final });
-    for (const a of res.answers) onAnswer?.(a);
-    return res;
-  } catch (e) {
-    debugError("webBackend", "ask failed", e);
-    throw e;
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < ASK_RETRIES; attempt++) {
+    try {
+      const res = await request<AskResponse>("/ask", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      debug("webBackend", "ask success", { answersCount: res.answers?.length, hasFinal: !!res.final });
+      for (const a of res.answers) onAnswer?.(a);
+      return res;
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+      const msg = lastError.message;
+      const isRetryable =
+        msg.includes("fetch") ||
+        msg.includes("network") ||
+        msg.includes("Failed to fetch") ||
+        msg.includes("500") ||
+        msg.includes("502") ||
+        msg.includes("503") ||
+        msg.includes("504") ||
+        msg.includes("ECONNRESET") ||
+        msg.includes("ETIMEDOUT");
+      if (!isRetryable || attempt === ASK_RETRIES - 1) {
+        debugError("webBackend", "ask failed", lastError);
+        throw lastError;
+      }
+      debugWarn("webBackend", "ask retry", { attempt: attempt + 1, msg: msg.slice(0, 80) });
+      await new Promise((r) => setTimeout(r, ASK_RETRY_DELAY_MS * (attempt + 1)));
+    }
   }
+  debugError("webBackend", "ask failed after retries", lastError);
+  throw lastError ?? new Error("Ask failed");
 }
 
 export async function webCheckBackend(): Promise<boolean> {
