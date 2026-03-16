@@ -13,62 +13,58 @@ function mapStripeStatus(status: string): string {
 }
 
 export async function registerWebhookRoutes(app: FastifyInstance): Promise<void> {
-  app.post(
-    "/webhooks/stripe",
-    { config: { rawBody: true } },
-    async (request, reply) => {
-      const webhookSecret = config.STRIPE_WEBHOOK_SECRET;
-      if (!stripeEnabled || !stripe || !webhookSecret) {
-        return reply.code(503).send({ error: "Stripe is not configured" });
-      }
-      const signature = request.headers["stripe-signature"];
-      if (!signature || typeof signature !== "string") {
-        return reply.code(400).send({ error: "Missing stripe-signature" });
-      }
-
-      const body = request.rawBody;
-      if (!body) {
-        return reply.code(400).send({ error: "Missing raw body" });
-      }
-
-      let event: Stripe.Event;
-      try {
-        event = stripe.webhooks.constructEvent(
-          body.toString(),
-          signature,
-          webhookSecret
-        );
-      } catch (error) {
-        return reply.code(400).send({
-          error: error instanceof Error ? error.message : "Webhook signature failed"
-        });
-      }
-
-      try {
-        if (
-          event.type === "checkout.session.completed" ||
-          event.type === "customer.subscription.updated" ||
-          event.type === "customer.subscription.created" ||
-          event.type === "customer.subscription.deleted"
-        ) {
-          const subscription =
-            event.type === "checkout.session.completed"
-              ? await resolveSubscriptionFromCheckoutSession(event.data.object as Stripe.Checkout.Session)
-              : (event.data.object as Stripe.Subscription);
-
-          await upsertSubscriptionFromStripe(subscription);
-        }
-        if (event.type === "invoice.payment_failed") {
-          app.log.warn({ eventId: event.id }, "Stripe invoice.payment_failed");
-        }
-      } catch (error) {
-        app.log.error(error);
-        return reply.code(500).send({ error: "Webhook processing failed" });
-      }
-
-      return { received: true };
+  app.post("/webhooks/stripe", async (request, reply) => {
+    const webhookSecret = config.STRIPE_WEBHOOK_SECRET;
+    if (!stripeEnabled || !stripe || !webhookSecret) {
+      return reply.code(503).send({ error: "Stripe is not configured" });
     }
-  );
+    const signature = request.headers["stripe-signature"];
+    if (!signature || typeof signature !== "string") {
+      return reply.code(400).send({ error: "Missing stripe-signature" });
+    }
+
+    const body = request.rawBody;
+    if (!body) {
+      return reply.code(400).send({ error: "Missing raw body" });
+    }
+
+    let event: Stripe.Event;
+    try {
+      event = stripe.webhooks.constructEvent(
+        body.toString(),
+        signature,
+        webhookSecret
+      );
+    } catch (error) {
+      return reply.code(400).send({
+        error: error instanceof Error ? error.message : "Webhook signature failed"
+      });
+    }
+
+    try {
+      if (
+        event.type === "checkout.session.completed" ||
+        event.type === "customer.subscription.updated" ||
+        event.type === "customer.subscription.created" ||
+        event.type === "customer.subscription.deleted"
+      ) {
+        const subscription =
+          event.type === "checkout.session.completed"
+            ? await resolveSubscriptionFromCheckoutSession(event.data.object as Stripe.Checkout.Session)
+            : (event.data.object as Stripe.Subscription);
+
+        await upsertSubscriptionFromStripe(subscription);
+      }
+      if (event.type === "invoice.payment_failed") {
+        app.log.warn({ eventId: event.id }, "Stripe invoice.payment_failed");
+      }
+    } catch (error) {
+      app.log.error(error);
+      return reply.code(500).send({ error: "Webhook processing failed" });
+    }
+
+    return { received: true };
+  });
 }
 
 async function resolveSubscriptionFromCheckoutSession(

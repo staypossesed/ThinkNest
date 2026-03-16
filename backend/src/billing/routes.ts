@@ -91,11 +91,15 @@ export async function registerBillingRoutes(app: FastifyInstance): Promise<void>
         const customerId = await ensureStripeCustomer(user);
         const priceId = getPriceIdForPlan(plan);
 
+        const baseSuccess = config.STRIPE_SUCCESS_URL!;
+        const successUrl = baseSuccess.includes("?")
+          ? `${baseSuccess}&checkout=success`
+          : `${baseSuccess}?checkout=success`;
         const sessionParams: Stripe.Checkout.SessionCreateParams = {
           mode: "subscription",
           customer: customerId,
           line_items: [{ price: priceId, quantity: 1 }],
-          success_url: config.STRIPE_SUCCESS_URL!,
+          success_url: successUrl,
           cancel_url: config.STRIPE_CANCEL_URL!,
           metadata: { userId: user.id, plan }
         };

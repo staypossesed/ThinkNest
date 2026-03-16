@@ -7,46 +7,58 @@ export interface UsageStatus {
   periodKey: string;
 }
 
-export async function getUsageStatus(
-  userId: string,
-  entitlement: UserEntitlement
-): Promise<UsageStatus> {
-  const periodKey = computePeriodKey(entitlement.periodType);
+/** Статус мульти-ответа: 100/неделю, обычный ответ — безлимит */
+export async function getMultiAnswerUsageStatus(userId: string, entitlement: UserEntitlement): Promise<UsageStatus> {
+  const periodKey = computePeriodKey("weekly");
   const { data, error } = await supabase
     .from("usage_counters")
     .select("used_count")
     .eq("user_id", userId)
     .eq("period_key", periodKey)
-    .eq("period_type", entitlement.periodType)
+    .eq("period_type", "weekly")
     .maybeSingle<{ used_count: number }>();
 
   if (error) {
-    throw new Error(`Failed to get usage status: ${error.message}`);
+    throw new Error(`Failed to get multi-answer usage status: ${error.message}`);
   }
 
   const used = data?.used_count ?? 0;
-  const remaining = Math.max(0, entitlement.maxQuestions - used);
+  const max = entitlement.maxMultiAnswer ?? 100;
+  const remaining = Math.max(0, max - used);
   return { used, remaining, periodKey };
+}
+
+export async function getUsageStatus(
+  userId: string,
+  entitlement: UserEntitlement
+): Promise<UsageStatus> {
+  return getMultiAnswerUsageStatus(userId, entitlement);
 }
 
 export async function consumeUsage(
   userId: string,
   entitlement: UserEntitlement,
-  question: string
+  question: string,
+  count = 1
 ): Promise<UsageStatus> {
-  const status = await getUsageStatus(userId, entitlement);
-  if (status.remaining <= 0) {
+  if (count <= 1) {
+    return getMultiAnswerUsageStatus(userId, entitlement);
+  }
+
+  const status = await getMultiAnswerUsageStatus(userId, entitlement);
+  const consumeAmount = 1;
+  if (status.remaining < consumeAmount) {
     return status;
   }
 
   const periodKey = status.periodKey;
-  const nextUsed = status.used + 1;
+  const nextUsed = status.used + consumeAmount;
 
   const { error: upsertError } = await supabase.from("usage_counters").upsert(
     {
       user_id: userId,
       period_key: periodKey,
-      period_type: entitlement.periodType,
+      period_type: "weekly",
       used_count: nextUsed
     },
     { onConflict: "user_id,period_type,period_key" }
@@ -66,9 +78,10 @@ export async function consumeUsage(
     throw new Error(`Failed to insert usage event: ${eventError.message}`);
   }
 
+  const max = entitlement.maxMultiAnswer ?? 100;
   return {
     used: nextUsed,
-    remaining: Math.max(0, entitlement.maxQuestions - nextUsed),
+    remaining: Math.max(0, max - nextUsed),
     periodKey
   };
 }

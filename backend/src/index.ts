@@ -1,6 +1,5 @@
 import Fastify, { FastifyReply, FastifyRequest } from "fastify";
 import cors from "@fastify/cors";
-import rawBody from "fastify-raw-body";
 import { config } from "./config";
 import { registerAuthRoutes } from "./auth/routes";
 import { verifySessionToken } from "./auth/jwt";
@@ -15,20 +14,23 @@ const app = Fastify({
   logger: true
 });
 
+// Custom parser: store raw body for Stripe webhook signature verification (fastify-raw-body was unreliable)
+app.addContentTypeParser("application/json", { parseAs: "buffer" }, (req, payload, done) => {
+  req.rawBody = payload as Buffer;
+  try {
+    const str = (payload as Buffer).toString("utf8");
+    done(null, str ? JSON.parse(str) : {});
+  } catch (err) {
+    done(err as Error, undefined);
+  }
+});
+
 const corsOrigins = config.APP_ORIGINS
   ? [config.APP_ORIGIN, ...config.APP_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean)]
   : [config.APP_ORIGIN];
 app.register(cors, {
   origin: corsOrigins,
   credentials: true
-});
-
-app.register(rawBody, {
-  field: "rawBody",
-  global: false,
-  encoding: "utf8",
-  runFirst: true,
-  routes: ["/webhooks/stripe"]
 });
 
 app.decorate(
