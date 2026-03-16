@@ -1,6 +1,7 @@
 import type { AskResponse, AgentAnswer } from "../../shared/types";
 import type { UiLocale } from "./LanguageSelector";
 import ShareButton from "./ShareButton";
+import { t } from "../i18n";
 
 interface Props {
   question: string;
@@ -9,7 +10,12 @@ interface Props {
   uiLocale: UiLocale;
 }
 
-function buildMarkdown(question: string, answers: AgentAnswer[], final: AskResponse["final"] | null): string {
+function buildMarkdown(
+  question: string,
+  answers: AgentAnswer[],
+  final: AskResponse["final"] | null,
+  finalAnswerLabel: string
+): string {
   const lines: string[] = [];
   lines.push(`# ${question}`);
   lines.push("");
@@ -22,14 +28,14 @@ function buildMarkdown(question: string, answers: AgentAnswer[], final: AskRespo
   }
   if (final) {
     lines.push("---");
-    lines.push("## Итоговый ответ");
+    lines.push(`## ${finalAnswerLabel}`);
     lines.push(final.content);
   }
   return lines.join("\n");
 }
 
 export default function ExportPanel({ question, answers, final, uiLocale }: Props) {
-  const md = buildMarkdown(question, answers, final);
+  const md = buildMarkdown(question, answers, final, t(uiLocale, "finalAnswerSection"));
   const filename = `thinknest-${Date.now()}.md`;
 
   const exportMarkdown = () => {
@@ -57,18 +63,18 @@ export default function ExportPanel({ question, answers, final, uiLocale }: Prop
       <button
         type="button"
         onClick={exportMarkdown}
-        title="Export Markdown"
+        title={t(uiLocale, "downloadMd")}
         className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
       >
-        📄 {uiLocale === "ru" ? "Скачать MD" : uiLocale === "zh" ? "下载 MD" : "Download MD"}
+        📄 {t(uiLocale, "downloadMd")}
       </button>
       <button
         type="button"
         onClick={copyMarkdown}
-        title="Copy Markdown"
+        title={t(uiLocale, "copy")}
         className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
       >
-        📋 {uiLocale === "ru" ? "Копировать" : uiLocale === "zh" ? "复制" : "Copy"}
+        📋 {t(uiLocale, "copy")}
       </button>
       <ShareButton question={question} answers={answers} final={final} uiLocale={uiLocale} />
     </div>

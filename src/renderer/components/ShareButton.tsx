@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AgentAnswer, AskResponse } from "../../shared/types";
 import type { UiLocale } from "./LanguageSelector";
+import { t } from "../i18n";
 
 interface Props {
   question: string;
@@ -83,7 +84,7 @@ export default function ShareButton({ question, answers, final, uiLocale }: Prop
     <button
       type="button"
       onClick={share}
-      title="Share"
+      title={t(uiLocale, "share")}
       className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
     >
       {label}
