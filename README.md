@@ -73,21 +73,28 @@ cp src/main/prompts.private.example.ts src/main/prompts.private.ts
 
 ## Запуск
 
-### Desktop (локально, без backend)
+### Локальный режим (без backend)
 
 ```bash
 npm run dev:local
 ```
 
-Ollama должен быть запущен. 4 агента без лимитов.
+- **Без backend** — только Electron + Vite + main
+- **Без входа** — Google OAuth не нужен, `DEV_MODE=true`
+- **Ollama** должен быть запущен
+- 4 агента без лимитов
 
-### Полный стек (backend + Google + Stripe)
+### Полный режим (backend + Google + Stripe)
 
 ```bash
 npm run dev
 ```
 
-Запускает backend (8787), renderer (5173), Electron.
+- **С backend** — backend (8787), renderer (5173), Electron
+- **Вход через Google** — нужен `backend/.env` с `GOOGLE_*`, `APP_ORIGIN`, `GOOGLE_REDIRECT_URI`
+- Для localhost: `GOOGLE_REDIRECT_URI=http://localhost:8787/auth/google/callback` (callback на backend)
+- **Google Console** — добавь в Authorized redirect URIs: `http://localhost:8787/auth/google/callback`
+- Отладка: открой `http://localhost:8787/auth/google/redirect-uri` — там URL, который должен быть в Google Console
 
 ### Web-режим (браузер/мобилка)
 
@@ -121,6 +128,19 @@ PORT=3000
 
 ---
 
+## Тесты
+
+```bash
+npm run test           # Vitest: промпты, конфиг, webBackendClient (retries, health)
+npm run test:watch     # Vitest в watch-режиме
+npm run test:billing   # Проверка Stripe и /health
+npm run test:ask-api   # Интеграция: /health, /ask (нужен backend)
+```
+
+Веб и десктоп используют одинаковые промпты (TRUTHFUL_FAST) и модели — ответы не должны отличаться.
+
+---
+
 ## Документация
 
 | Файл | Описание |
@@ -135,6 +155,17 @@ PORT=3000
 ---
 
 ## История исправлений (Changelog)
+
+### 2026-02-27 (web parity)
+
+**Веб = десктоп по качеству ответов:**
+- Backend промпты заменены на TRUTHFUL_FAST_PROMPT (как в prompts.private)
+- SYSTEM_PREFIX: «ЗАПРЕЩЕНО отказываться, говорить „вопрос расплывчатый“»
+- Retries в webAsk: 3 попытки при 5xx, network errors
+- Таймаут backend: 60000 (как в main)
+- Vitest: 19 тестов (prompts, askConfig, webBackendClient, orchestrator)
+
+---
 
 ### 2026-03-15
 
@@ -182,3 +213,9 @@ PORT=3000
 
 **Backend недоступен:**  
 Запусти `npm run dev:backend` и `npm run dev:renderer`, открой браузер (не Electron).
+
+**ERR_NGROK_3200 / redirect_uri_mismatch:**  
+1. Останови backend (Ctrl+C), перезапусти `npm run dev`.  
+2. Открой `http://localhost:8787/health` — скопируй `redirect_uri` оттуда.  
+3. В Google Console → Credentials → OAuth 2.0 Client (с твоим GOOGLE_CLIENT_ID) → Authorized redirect URIs — добавь **точно такой же** URL (копируй из /health).  
+4. Сохрани, подожди 5–10 мин. Добавь оба варианта на всякий случай: `http://localhost:8787/auth/google/callback` и `http://127.0.0.1:8787/auth/google/callback`.
