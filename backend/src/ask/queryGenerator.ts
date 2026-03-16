@@ -1,8 +1,8 @@
 import { chatCompletion } from "./ollama";
 import { ollamaConfig } from "./askConfig";
 
-/** Быстрая модель из обязательного набора (llama3.2:3b, qwen2.5:3b) */
-const QUERY_MODEL = "llama3.2:3b";
+/** Быстрая модель из обязательного набора (llama3.1:8b, qwen2.5:7b) */
+const QUERY_MODEL = "llama3.1:8b";
 const QUERY_TIMEOUT_MS = 5000;
 
 /**

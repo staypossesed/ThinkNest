@@ -4,9 +4,9 @@ import { getPrompts } from "./prompts.config";
 describe("backend prompts.config", () => {
   it("returns TRUTHFUL_FAST_PROMPT base with never-refuse instruction", () => {
     const p = getPrompts();
-    expect(p.basePrompt).toContain("ГЛАВНОЕ: ОБЯЗАТЕЛЬНО отвечай на вопрос");
-    expect(p.basePrompt).toContain("Никогда не отказывайся");
-    expect(p.basePrompt).toContain("не задавай уточняющих вопросов");
+    expect(p.basePrompt).toContain("CRITICAL: ALWAYS answer the question");
+    expect(p.basePrompt).toContain("Never refuse");
+    expect(p.basePrompt).toContain("Never mix scripts");
   });
 
   it("has 4 agents with Russian titles matching prompts.private", () => {
@@ -19,7 +19,7 @@ describe("backend prompts.config", () => {
   it("each agent has TRUTHFUL_FAST_PROMPT and role-specific instructions", () => {
     const p = getPrompts();
     for (const a of p.agents) {
-      expect(a.systemPrompt).toContain("ГЛАВНОЕ: ОБЯЗАТЕЛЬНО отвечай");
+      expect(a.systemPrompt).toContain("CRITICAL: ALWAYS answer");
       expect(a.systemPrompt).toContain("[РОЛЬ:");
     }
   });
