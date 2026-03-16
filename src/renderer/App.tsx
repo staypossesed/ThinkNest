@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { flushSync } from "react-dom";
 import type {
   AgentAnswer,
   AskResponse,
@@ -56,6 +55,7 @@ export default function App() {
   const [expertProfile, setExpertProfile] = useState("");
   const [showMemoryPanel, setShowMemoryPanel] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showCheckoutSuccess, setShowCheckoutSuccess] = useState(false);
   const [subscription, setSubscription] = useState<{
     active: boolean;
     interval: string | null;
@@ -85,6 +85,8 @@ export default function App() {
 
   const answersRef = useRef<AgentAnswer[]>([]);
   const [streamingTokens, setStreamingTokens] = useState<Record<string, string>>({});
+  const streamBufferRef = useRef<Record<string, string>>({});
+  const streamThrottleRef = useRef<number | null>(null);
 
   const {
     conversations,
@@ -95,6 +97,7 @@ export default function App() {
     updateMessage,
     selectConversation,
     deleteConversation,
+    updateConversationTitle,
     newChat
   } = useConversations(devMode);
 
@@ -105,7 +108,7 @@ export default function App() {
     try {
       localStorage.setItem(LANG_STORAGE_KEY, locale);
     } catch {}
-    flushSync(() => setUiLocale(locale));
+    setUiLocale(locale);
     if (loading && window.api?.setAskLocale) {
       window.api.setAskLocale(locale);
     }
@@ -182,6 +185,33 @@ export default function App() {
     };
     bootstrap();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+    if (params.get("checkout") === "success") {
+      setShowCheckoutSuccess(true);
+      params.delete("checkout");
+      const newSearch = params.toString();
+      const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : "");
+      window.history.replaceState({}, "", newUrl);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showCheckoutSuccess && session?.token) {
+      refreshEntitlements();
+    }
+  }, [showCheckoutSuccess, session?.token]);
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible" && session?.token) {
+        refreshEntitlements();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [session?.token]);
 
   const refreshEntitlements = async (sessionOverride?: SessionState) => {
     const current = await window.api.getEntitlements();
@@ -291,10 +321,15 @@ export default function App() {
 
     setLoadingConversationIds((prev) => new Set([...prev, conv.id]));
     setStreamingTokens({});
+    streamBufferRef.current = {};
+    if (streamThrottleRef.current != null) {
+      clearTimeout(streamThrottleRef.current);
+      streamThrottleRef.current = null;
+    }
     answersRef.current = [];
 
     try {
-      const canAsk = await window.api.canAsk();
+      const canAsk = await window.api.canAsk(deepResearchMode);
       setEntitlements(canAsk.entitlements);
       if (!canAsk.allowed) {
         setError(canAsk.reason ?? t(uiLocale, "limitExceeded"));
@@ -318,6 +353,11 @@ export default function App() {
         } catch {}
         return "balanced";
       })();
+      const chatHistory = (conv as { messages?: Array<{ question: string; final?: { content: string } | null }> }).messages
+        ?.filter((m) => m.final)
+        .slice(-6)
+        .map((m) => ({ question: m.question, answer: m.final!.content })) ?? [];
+
       const response = await window.api.ask(
         {
           question: questionText,
@@ -329,6 +369,7 @@ export default function App() {
           debateMode: true,
           expertProfile: (ent.allowExpertProfile !== false && expertProfile) ? expertProfile : undefined,
           memoryContext: (ent.allowMemory !== false && memoryContext) ? memoryContext : undefined,
+          chatHistory: chatHistory.length > 0 ? chatHistory : undefined,
           preferredLocale,
           images: imagesToSend
         },
@@ -349,10 +390,17 @@ export default function App() {
           });
         },
         (agentId: string, token: string) => {
-          setStreamingTokens((prev) => ({
-            ...prev,
-            [agentId]: (prev[agentId] ?? "") + token
-          }));
+          streamBufferRef.current = {
+            ...streamBufferRef.current,
+            [agentId]: (streamBufferRef.current[agentId] ?? "") + token
+          };
+          if (streamThrottleRef.current == null) {
+            const throttleMs = deepResearchMode ? 150 : 80;
+            streamThrottleRef.current = window.setTimeout(() => {
+              streamThrottleRef.current = null;
+              setStreamingTokens({ ...streamBufferRef.current });
+            }, throttleMs);
+          }
         }
       );
 
@@ -362,12 +410,15 @@ export default function App() {
         webSources: response.webSources ?? null
       });
 
-      const usage = await window.api.consumeUsage(questionText);
+      const consumeCount = deepResearchMode ? ent.maxAgents : 1;
+      const usage = await window.api.consumeUsage(questionText, consumeCount);
       setEntitlements(usage.entitlements);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : t(uiLocale, "askFailed");
-      setError(message);
+      const isAbort = err instanceof Error && (err.name === "AbortError" || err.message?.includes("abort") || err.message?.includes("user-stop"));
+      if (!isAbort) {
+        const message = err instanceof Error ? err.message : t(uiLocale, "askFailed");
+        setError(message);
+      }
     } finally {
       setLoadingConversationIds((prev) => {
         const next = new Set(prev);
@@ -379,6 +430,7 @@ export default function App() {
 
   const handleStop = () => {
     window.api.stopAsk?.();
+    setLoadingConversationIds(new Set());
   };
 
   const handleNewChat = () => {
@@ -414,6 +466,7 @@ export default function App() {
         }}
         onNewChat={handleNewChat}
         onDelete={deleteConversation}
+        onRename={updateConversationTitle}
         session={session}
         entitlements={entitlements}
         devMode={devMode}
@@ -517,6 +570,27 @@ export default function App() {
         onClose={() => setShowUpgradeModal(false)}
         onSelectPlan={handleSelectPlan}
       />
+    )}
+    {showCheckoutSuccess && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div className="mx-4 max-w-md rounded-2xl border border-white/10 bg-[#0f0f0f] p-6 shadow-xl">
+          <h2 className="mb-3 text-lg font-semibold text-white">
+            {t(uiLocale, "checkoutSuccessTitle")}
+          </h2>
+          <p className="mb-4 text-sm text-gray-300">
+            {session?.token
+              ? t(uiLocale, "checkoutSuccessLoggedIn")
+              : t(uiLocale, "checkoutSuccessNotLoggedIn")}
+          </p>
+          <button
+            type="button"
+            className="w-full rounded-xl bg-purple-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-purple-500"
+            onClick={() => setShowCheckoutSuccess(false)}
+          >
+            {t(uiLocale, "close")}
+          </button>
+        </div>
+      </div>
     )}
     </>
   );

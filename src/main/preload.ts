@@ -44,9 +44,10 @@ contextBridge.exposeInMainWorld("api", {
   loginWithGoogle: (): Promise<SessionState> => ipcRenderer.invoke("auth:google-login"),
   logout: (): Promise<{ ok: true }> => ipcRenderer.invoke("auth:logout"),
   getEntitlements: (): Promise<Entitlements> => ipcRenderer.invoke("entitlements:get"),
-  canAsk: (): Promise<CanAskResponse> => ipcRenderer.invoke("usage:can-ask"),
-  consumeUsage: (question: string): Promise<ConsumeUsageResponse> =>
-    ipcRenderer.invoke("usage:consume", question),
+  canAsk: (deepResearchMode?: boolean): Promise<CanAskResponse> =>
+    ipcRenderer.invoke("usage:can-ask", deepResearchMode),
+  consumeUsage: (question: string, count?: number): Promise<ConsumeUsageResponse> =>
+    ipcRenderer.invoke("usage:consume", question, count ?? 1),
   openCheckout: (plan?: "weekly" | "monthly" | "yearly") =>
     ipcRenderer.invoke("billing:checkout", plan ?? "monthly"),
   getSubscription: () => ipcRenderer.invoke("billing:subscription"),
