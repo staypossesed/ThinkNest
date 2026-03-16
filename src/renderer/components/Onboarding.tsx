@@ -7,7 +7,7 @@ const MODE_STORAGE_KEY = "thinknest_mode";
 export type OllamaMode = "fast" | "balanced" | "quality";
 
 /** Модели устанавливаются автоматически — фиксированный набор */
-const REQUIRED_MODELS = ["llama3.2:3b", "qwen2.5:3b", "deepseek-r1:7b", "llava"] as const;
+const REQUIRED_MODELS = ["llama3.1:8b", "qwen2.5:7b", "llava"] as const;
 
 interface OllamaStatus {
   installed: boolean;

@@ -128,23 +128,23 @@ export const HARDWARE_PROFILES = {
   light: {
     label: "Слабый CPU (4–8 GB RAM)",
     labelEn: "Light CPU (4–8 GB RAM)",
-    models: ["llama3.2:3b", "qwen2.5:3b"],
-    agentModel: "llama3.2:3b",
-    aggregatorModel: "llama3.2:3b"
+    models: ["llama3.1:8b", "qwen2.5:7b"],
+    agentModel: "llama3.1:8b",
+    aggregatorModel: "llama3.1:8b"
   },
   medium: {
     label: "Средний CPU/GPU (8–16 GB)",
     labelEn: "Medium CPU/GPU (8–16 GB)",
-    models: ["llama3.2:3b", "qwen2.5:3b", "deepseek-r1:7b"],
-    agentModel: "llama3.2:3b",
-    aggregatorModel: "llama3.2:3b"
+    models: ["llama3.1:8b", "qwen2.5:7b"],
+    agentModel: "llama3.1:8b",
+    aggregatorModel: "llama3.1:8b"
   },
   powerful: {
     label: "Мощный GPU (16+ GB VRAM)",
     labelEn: "Powerful GPU (16+ GB)",
-    models: ["llama3.2:3b", "qwen2.5:3b", "deepseek-r1:7b"],
-    agentModel: "llama3.2:3b",
-    aggregatorModel: "llama3.2:3b"
+    models: ["llama3.1:8b", "qwen2.5:7b"],
+    agentModel: "llama3.1:8b",
+    aggregatorModel: "llama3.1:8b"
   }
 } as const;
 
