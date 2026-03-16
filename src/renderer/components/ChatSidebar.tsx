@@ -170,6 +170,7 @@ export default function ChatSidebar({
             }`}
             onClick={() => onSelect(c.id)}
             onKeyDown={(e) => {
+              if (editingId === c.id) return;
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
                 onSelect(c.id);
