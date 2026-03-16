@@ -8,10 +8,10 @@ Desktop и веб-приложение с 4 AI-агентами (Strategist, Ske
 |------|----------|
 | Быстрый старт (5 мин) | [README_FIRST.md](./README_FIRST.md) |
 | Обновить и запустить сайт | [README.md#обновление-и-запуск-веб-сайта](#обновление-и-запуск-веб-сайта) |
-| Деплой на сервер (production) | [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) |
-| Timeweb (CPU-only, быстрый) | [DEPLOY_TIMEWEB_QUICK.md](./DEPLOY_TIMEWEB_QUICK.md) |
-| Web-режим, ngrok | [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md) |
-| Stripe, подписки | [STRIPE_SETUP.md](./STRIPE_SETUP.md) |
+| Деплой на сервер (production) | [docs/DEPLOY_UBUNTU.md](./docs/DEPLOY_UBUNTU.md) |
+| Timeweb (CPU-only, быстрый) | [docs/DEPLOY_TIMEWEB_QUICK.md](./docs/DEPLOY_TIMEWEB_QUICK.md) |
+| Web-режим, ngrok | [docs/WEB_MODE_SETUP.md](./docs/WEB_MODE_SETUP.md) |
+| Stripe, подписки | [docs/STRIPE_SETUP.md](./docs/STRIPE_SETUP.md) |
 | Проверка оплаты | [docs/BILLING_VERIFY.md](./docs/BILLING_VERIFY.md) |
 | Исправление смешения языков | [docs/FIX_LANGUAGE_MIXING.md](./docs/FIX_LANGUAGE_MIXING.md) |
 
@@ -117,7 +117,7 @@ npm run dev:backend
 npm run dev:renderer
 ```
 
-Открой `http://localhost:5173`. Для ngrok — см. [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md).
+Открой `http://localhost:5173`. Для ngrok — см. [docs/WEB_MODE_SETUP.md](./docs/WEB_MODE_SETUP.md).
 
 ### Server (VPS, Express)
 
@@ -148,7 +148,7 @@ npm run build:renderer
 pm2 restart thinknest-backend
 ```
 
-Открой сайт в браузере. Подробнее: [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) (Часть 10).
+Открой сайт в браузере. Подробнее: [docs/DEPLOY_UBUNTU.md](./docs/DEPLOY_UBUNTU.md) (Часть 10).
 
 ---
 
@@ -272,7 +272,7 @@ sudo certbot --nginx -d ТВОЙ_ДОМЕН
 3. Задай вопрос — ответ от AI
 4. «Обновить план» — Stripe Checkout, оплата подписки
 
-Подробнее: [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md).
+Подробнее: [docs/DEPLOY_UBUNTU.md](./docs/DEPLOY_UBUNTU.md).
 
 ### Альтернатива: только API (Express, без Google/Stripe)
 
@@ -301,10 +301,10 @@ npm run test:ask-api   # Интеграция: /health, /ask (нужен backend
 | Файл | Описание |
 |------|----------|
 | [README_FIRST.md](./README_FIRST.md) | Быстрый старт |
-| [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) | Деплой на Ubuntu — от клона до работающей ссылки |
-| [DEPLOY_TIMEWEB_QUICK.md](./DEPLOY_TIMEWEB_QUICK.md) | Timeweb (CPU-only), быстрое исправление |
-| [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md) | Web-режим, ngrok |
-| [STRIPE_SETUP.md](./STRIPE_SETUP.md) | Stripe, подписки |
+| [docs/DEPLOY_UBUNTU.md](./docs/DEPLOY_UBUNTU.md) | Деплой на Ubuntu — от клона до работающей ссылки |
+| [docs/DEPLOY_TIMEWEB_QUICK.md](./docs/DEPLOY_TIMEWEB_QUICK.md) | Timeweb (CPU-only), быстрое исправление |
+| [docs/WEB_MODE_SETUP.md](./docs/WEB_MODE_SETUP.md) | Web-режим, ngrok |
+| [docs/STRIPE_SETUP.md](./docs/STRIPE_SETUP.md) | Stripe, подписки |
 | [docs/BILLING_VERIFY.md](./docs/BILLING_VERIFY.md) | Проверка оплаты (тесты, инструкции) |
 | [docs/PUBLISHING.md](./docs/PUBLISHING.md) | Публикация репо |
 
@@ -396,7 +396,7 @@ npm run test:ask-api   # Интеграция: /health, /ask (нужен backend
 - Подключены реальные вызовы backend: `webGetSubscription`, `webOpenCheckout`, `webOpenPortal`
 - Добавлен debug-режим: `?debug=1` в URL или `localStorage.thinknest_debug=1` — логи в консоли (checkBackend, session, ask, 401)
 - Bootstrap в веб-режиме загружает entitlements даже без сессии (для UI)
-- В DEPLOY_UBUNTU.md — раздел про Google OAuth и отладку
+- В docs/DEPLOY_UBUNTU.md — раздел про Google OAuth и отладку
 
 ---
 
