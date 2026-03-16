@@ -21,17 +21,20 @@ ThinkNest is a desktop app with 4 AI agents (Planner, Critic, Pragmatist, Explai
    - `.env.example` → `.env`
 
 3. **Pull Ollama models** (one at a time):
+
    ```bash
-ollama pull llama3.1:8b
-ollama pull qwen2.5:7b
+   ollama pull llama3.1:8b
+   ollama pull qwen2.5:7b
    ```
-   
+
    Optional for images: `ollama pull llava`
 
 4. **Run:**
+
    ```bash
    npm run dev
    ```
+
    Opens the Electron app. Ollama must be running.
 
 ### Web Mode (browser / mobile)
@@ -72,16 +75,21 @@ ThinkNest — десктопное приложение с 4 AI-агентами
    - `.env.example` → `.env`
 
 3. **Скачай модели Ollama** (по одной):
+
    ```bash
-ollama pull llama3.1:8b
-ollama pull qwen2.5:7b
+   ollama pull llama3.1:8b
+   ollama pull qwen2.5:7b
    ```
+
    Опционально для картинок: `ollama pull llava`
 
+
 4. **Запуск:**
+
    ```bash
    npm run dev
    ```
+
    Откроется Electron-приложение. Ollama должен быть запущен.
 
 ### Веб-режим (браузер / мобилка)

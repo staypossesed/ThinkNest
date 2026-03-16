@@ -1,6 +1,7 @@
 # Backend (Stripe + Auth + Entitlements)
 
 ## Run locally
+
 1. Copy `.env.example` to `.env` and fill values.
 2. Apply SQL migration in Supabase SQL editor:
    - `supabase/migrations/001_init.sql`
@@ -9,6 +10,7 @@
    - `npm run dev`
 
 ## Endpoints
+
 - `GET /health`
 - `GET /portal` (web login + billing one-page)
 - `GET /auth/google/start`

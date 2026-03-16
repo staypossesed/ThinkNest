@@ -178,6 +178,7 @@ nginx/thinknest-full.conf      Nginx: статика + прокси /health, /au
 ### Пошаговый деплой
 
 **1. Подготовка сервера (Ubuntu 22.04):**
+
 ```bash
 sudo apt update && sudo apt upgrade -y
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
@@ -187,6 +188,7 @@ curl -fsSL https://ollama.com/install.sh | sh
 ```
 
 **2. Клонирование и сборка:**
+
 ```bash
 cd /home && sudo mkdir -p www && sudo chown $USER:$USER www && cd www
 git clone https://github.com/staypossesed/ThinkNest.git
@@ -199,6 +201,7 @@ npm run build:renderer
 ```
 
 **3. Переменные `backend/.env`:**
+
 ```bash
 cp backend/.env.example backend/.env
 nano backend/.env
@@ -236,12 +239,14 @@ OLLAMA_TIMEOUT_MS=90000
 **6. Stripe:** Webhook URL — `https://ТВОЙ_ДОМЕН/webhooks/stripe`. Customer Portal — Return URL `https://ТВОЙ_ДОМЕН`.
 
 **7. Модели Ollama:**
+
 ```bash
 ollama pull llama3.1:8b
 ollama pull qwen2.5:7b
 ```
 
 **8. Запуск backend:**
+
 ```bash
 pm2 start ecosystem-backend.config.js
 pm2 save
@@ -249,6 +254,7 @@ pm2 startup
 ```
 
 **9. Nginx:**
+
 ```bash
 sudo cp nginx/thinknest-full.conf /etc/nginx/sites-available/thinknest
 sudo nano /etc/nginx/sites-available/thinknest
@@ -258,6 +264,7 @@ sudo nginx -t && sudo systemctl reload nginx
 ```
 
 **10. SSL (рекомендуется):**
+
 ```bash
 sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d ТВОЙ_ДОМЕН

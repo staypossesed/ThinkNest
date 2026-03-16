@@ -359,10 +359,12 @@ pm2 restart thinknest-backend
 ## Отладка (debug mode)
 
 Добавь `?debug=1` к URL (например `http://85.239.54.249/?debug=1`) или выполни в консоли браузера:
+
 ```js
 localStorage.setItem('thinknest_debug', '1');
 location.reload();
 ```
+
 В консоли (F12 → Console) появятся логи: backend check, session, ask, 401 и т.д.
 
 ---

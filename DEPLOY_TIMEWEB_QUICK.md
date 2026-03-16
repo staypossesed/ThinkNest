@@ -33,6 +33,7 @@ sudo nginx -t && sudo systemctl reload nginx
 > ⚠️ **Не** используй `cat > backend/.env` — это сотрёт Supabase, Google, Stripe. Добавляй только недостающие строки.
 
 **Проверка:**
+
 ```bash
 pm2 status
 curl -I http://localhost
@@ -94,6 +95,7 @@ nano backend/.env
 ```
 
 Обязательно заполни:
+
 ```env
 PORT=8787
 APP_ORIGIN=http://85.239.54.249
