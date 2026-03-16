@@ -14,6 +14,8 @@ export interface AskRequest {
   images?: string[];
   expertProfile?: string;
   memoryContext?: string;
+  /** Previous Q&A in this chat for follow-up context */
+  chatHistory?: Array<{ question: string; answer: string }>;
 }
 
 export interface WebSource {
