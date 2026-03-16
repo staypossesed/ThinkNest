@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Settings } from "lucide-react";
 import Logo from "./Logo";
 import type { Conversation, SessionState, Entitlements } from "../../shared/types";
 import type { UiLocale } from "./LanguageSelector";
@@ -21,7 +20,6 @@ interface ChatSidebarProps {
   onLogout: () => void;
   onUpgrade: () => void;
   onManageBilling: () => void;
-  onRefreshPlan: () => void;
   loadingSession: boolean;
   uiLocale: UiLocale;
   mobileOpen?: boolean;
@@ -65,7 +63,6 @@ export default function ChatSidebar({
   onLogout,
   onUpgrade,
   onManageBilling,
-  onRefreshPlan,
   loadingSession,
   uiLocale,
   mobileOpen = false,
@@ -191,13 +188,6 @@ export default function ChatSidebar({
         {devMode ? (
           <div className="flex items-center justify-between gap-2">
             <span className="rounded-full bg-emerald-500/20 px-2.5 py-1 text-xs font-medium text-emerald-400">Dev</span>
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-white/10 hover:text-white"
-              title="Settings"
-            >
-              <Settings className="h-4 w-4" />
-            </button>
           </div>
         ) : session.user ? (
           <>
@@ -240,13 +230,6 @@ export default function ChatSidebar({
               </>
             )}
             <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="rounded-lg px-3 py-1.5 text-xs text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
-                onClick={onRefreshPlan}
-              >
-                {t(uiLocale, "refresh")}
-              </button>
               {entitlements?.plan === "free" && (
                 <button
                   type="button"
@@ -264,13 +247,6 @@ export default function ChatSidebar({
                 {t(uiLocale, "logout")}
               </button>
             </div>
-            <button
-              type="button"
-              className="mt-2 flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-white/10 hover:text-white"
-              title="Settings"
-            >
-              <Settings className="h-4 w-4" />
-            </button>
           </>
         ) : (
           <>
@@ -281,13 +257,6 @@ export default function ChatSidebar({
               className="w-full rounded-xl bg-purple-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-purple-500 disabled:opacity-50"
             >
               {loadingSession ? t(uiLocale, "loginGoogleLoading") : t(uiLocale, "loginGoogle")}
-            </button>
-            <button
-              type="button"
-              className="mt-2 flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-white/10 hover:text-white"
-              title="Settings"
-            >
-              <Settings className="h-4 w-4" />
             </button>
           </>
         )}
