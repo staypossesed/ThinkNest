@@ -4,6 +4,43 @@
 
 ---
 
+## Быстрое исправление (если уже клонировал, но demo-version)
+
+```bash
+cd /var/www/thinknest/ThinkNest
+
+# 1. Сборка (обязательно!)
+npm run build:renderer
+npm run build:backend
+
+# 2. Таймаут для CPU — обнови backend/.env (НЕ перезаписывай — иначе потеряешь Google/Stripe!)
+test -f backend/.env || cp backend/.env.example backend/.env
+grep -q 'OLLAMA_TIMEOUT_MS=' backend/.env && sed -i 's|OLLAMA_TIMEOUT_MS=.*|OLLAMA_TIMEOUT_MS=90000|' backend/.env || echo "OLLAMA_TIMEOUT_MS=90000" >> backend/.env
+grep -q 'OLLAMA_BASE_URL=' backend/.env && sed -i 's|OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=http://localhost:11434/v1|' backend/.env || echo "OLLAMA_BASE_URL=http://localhost:11434/v1" >> backend/.env
+
+# 3. PM2 (имя процесса — thinknest-backend)
+pm2 restart thinknest-backend || pm2 start ecosystem-backend.config.js --name thinknest-backend
+pm2 save
+
+# 4. Nginx — путь под /var/www
+sudo cp nginx/thinknest-full.conf /etc/nginx/sites-available/thinknest
+sudo sed -i 's|/home/www/ThinkNest|/var/www/thinknest/ThinkNest|g' /etc/nginx/sites-available/thinknest
+sudo sed -i 's|ТВОЙ_ДОМЕН|85.239.54.249|g' /etc/nginx/sites-available/thinknest
+sudo ln -sf /etc/nginx/sites-available/thinknest /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+> ⚠️ **Не** используй `cat > backend/.env` — это сотрёт Supabase, Google, Stripe. Добавляй только недостающие строки.
+
+**Проверка:**
+```bash
+pm2 status
+curl -I http://localhost
+curl http://127.0.0.1:8787/health
+```
+
+---
+
 ## Важно: два режима
 
 | Режим | Файл | Порт | Nginx | Модели |
