@@ -10,7 +10,7 @@ Desktop и веб-приложение с 4 AI-агентами (Strategist, Ske
 | Обновить и запустить сайт | [README.md#обновление-и-запуск-веб-сайта](#обновление-и-запуск-веб-сайта) |
 | Деплой на сервер (production) | [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) |
 | Timeweb (CPU-only, быстрый) | [DEPLOY_TIMEWEB_QUICK.md](./DEPLOY_TIMEWEB_QUICK.md) |
-| Web-режим, ngrok | [docs/WEB_MODE_SETUP.md](./docs/WEB_MODE_SETUP.md) |
+| Web-режим, ngrok | [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md) |
 | Stripe, подписки | [docs/STRIPE_SETUP.md](./docs/STRIPE_SETUP.md) |
 | Проверка оплаты | [docs/BILLING_VERIFY.md](./docs/BILLING_VERIFY.md) |
 | Исправление смешения языков | [docs/FIX_LANGUAGE_MIXING.md](./docs/FIX_LANGUAGE_MIXING.md) |
@@ -117,7 +117,7 @@ npm run dev:backend
 npm run dev:renderer
 ```
 
-Открой `http://localhost:5173`. Для ngrok — см. [docs/WEB_MODE_SETUP.md](./docs/WEB_MODE_SETUP.md).
+Открой `http://localhost:5173`. Для ngrok — см. [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md).
 
 ### Server (VPS, Express)
 
@@ -303,7 +303,7 @@ npm run test:ask-api   # Интеграция: /health, /ask (нужен backend
 | [README_FIRST.md](./README_FIRST.md) | Быстрый старт |
 | [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) | Деплой на Ubuntu — от клона до работающей ссылки |
 | [DEPLOY_TIMEWEB_QUICK.md](./DEPLOY_TIMEWEB_QUICK.md) | Timeweb (CPU-only), быстрое исправление |
-| [docs/WEB_MODE_SETUP.md](./docs/WEB_MODE_SETUP.md) | Web-режим, ngrok |
+| [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md) | Web-режим, ngrok |
 | [docs/STRIPE_SETUP.md](./docs/STRIPE_SETUP.md) | Stripe, подписки |
 | [docs/BILLING_VERIFY.md](./docs/BILLING_VERIFY.md) | Проверка оплаты (тесты, инструкции) |
 | [docs/PUBLISHING.md](./docs/PUBLISHING.md) | Публикация репо |

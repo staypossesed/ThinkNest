@@ -148,7 +148,7 @@ OLLAMA_BASE_URL=http://localhost:11434/v1
 OLLAMA_TIMEOUT_MS=90000
 ```
 
-> `APP_ORIGINS` — если нужны доп. origins (через запятую). Stripe: см. [STRIPE_SETUP.md](./STRIPE_SETUP.md).
+> `APP_ORIGINS` — если нужны доп. origins (через запятую). Stripe: см. [docs/STRIPE_SETUP.md](./docs/STRIPE_SETUP.md).
 
 ### 3.2. Миграции Supabase
 

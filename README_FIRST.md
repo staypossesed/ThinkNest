@@ -44,7 +44,7 @@ npm run dev:renderer
 
 Open **http://localhost:5173** in Chrome or Edge (not Electron). Sign in with Google to ask questions.
 
-For mobile access: use `ngrok http 5173` and add the ngrok URL to `backend/.env` and Google OAuth. See [docs/WEB_MODE_SETUP.md](./docs/WEB_MODE_SETUP.md).
+For mobile access: use `ngrok http 5173` and add the ngrok URL to `backend/.env` and Google OAuth. See [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md).
 
 ### Production Deployment
 
@@ -94,7 +94,7 @@ npm run dev:renderer
 
 Открой **http://localhost:5173** в Chrome или Edge (не Electron). Войди через Google, чтобы задавать вопросы.
 
-Для доступа с телефона: используй `ngrok http 5173` и добавь ngrok URL в `backend/.env` и Google OAuth. См. [docs/WEB_MODE_SETUP.md](./docs/WEB_MODE_SETUP.md).
+Для доступа с телефона: используй `ngrok http 5173` и добавь ngrok URL в `backend/.env` и Google OAuth. См. [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md).
 
 ### Production-деплой
 
