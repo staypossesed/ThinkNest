@@ -48,7 +48,7 @@ For mobile access: use `ngrok http 5173` and add the ngrok URL to `backend/.env`
 
 ### Production Deployment
 
-See [README.md](./README.md) and [docs/DEPLOY_UBUNTU.md](./docs/DEPLOY_UBUNTU.md) for full deployment: Google login, Stripe subscriptions, server setup.
+See [README.md](./README.md) and [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) for full deployment: Google login, Stripe subscriptions, server setup.
 
 ---
 
@@ -98,4 +98,4 @@ npm run dev:renderer
 
 ### Production-деплой
 
-См. [README.md](./README.md) и [docs/DEPLOY_UBUNTU.md](./docs/DEPLOY_UBUNTU.md) — вход через Google, подписки Stripe, настройка сервера.
+См. [README.md](./README.md) и [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) — вход через Google, подписки Stripe, настройка сервера.
