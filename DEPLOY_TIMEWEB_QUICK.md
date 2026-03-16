@@ -39,6 +39,27 @@ curl -I http://localhost
 curl http://127.0.0.1:8787/health
 ```
 
+**В браузере:** открой `http://85.239.54.249` и нажми **Ctrl+Shift+R** (жёсткое обновление, без кэша).
+
+---
+
+## Диагностика demo-version
+
+Если видишь «Запустите npm run dev:backend», «demo • 0 ms» или бейдж «Dev»:
+
+| Симптом | Причина | Решение |
+|---------|---------|---------|
+| «npm run dev:backend» | Backend недоступен или открыт localhost | Открой **http://85.239.54.249** (не localhost). Проверь `curl http://127.0.0.1:8787/health` |
+| «Dev» в сайдбаре | Только в Electron dev-режиме | В браузере бейджа быть не должно. Если видишь — возможно открыт localhost или старый кэш |
+| Старые сообщения | Кэш браузера | **Ctrl+Shift+R** или очисти кэш |
+| 404 / пустая страница | Nginx root неверный или dist пустой | `ls -la dist/renderer/` — должны быть index.html, assets/. Пересобери: `npm run build:renderer` |
+
+**Быстрая проверка:**
+```bash
+ls -la dist/renderer/          # index.html и assets/ должны быть
+curl -s http://127.0.0.1:8787/health | head -1   # должен вернуть JSON
+```
+
 ---
 
 ## Важно: два режима
