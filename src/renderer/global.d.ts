@@ -34,8 +34,8 @@ declare global {
       loginWithGoogle: () => Promise<SessionState>;
       logout: () => Promise<{ ok: true }>;
       getEntitlements: () => Promise<Entitlements>;
-      canAsk: () => Promise<CanAskResponse>;
-      consumeUsage: (question: string) => Promise<ConsumeUsageResponse>;
+      canAsk: (deepResearchMode?: boolean) => Promise<CanAskResponse>;
+      consumeUsage: (question: string, count?: number) => Promise<ConsumeUsageResponse>;
       openCheckout: (plan?: "weekly" | "monthly" | "yearly") => Promise<{ ok: true }>;
       getSubscription: () => Promise<{
         active: boolean;

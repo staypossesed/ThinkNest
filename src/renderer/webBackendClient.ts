@@ -124,14 +124,17 @@ export async function webGetEntitlements(): Promise<Entitlements> {
   return request("/entitlements", { method: "GET" });
 }
 
-export async function webCanAsk(): Promise<CanAskResponse> {
-  return request("/usage/can-ask", { method: "POST", body: "{}" });
+export async function webCanAsk(deepResearchMode?: boolean): Promise<CanAskResponse> {
+  return request("/usage/can-ask", {
+    method: "POST",
+    body: JSON.stringify({ deepResearchMode: !!deepResearchMode })
+  });
 }
 
-export async function webConsumeUsage(question: string): Promise<ConsumeUsageResponse> {
+export async function webConsumeUsage(question: string, count = 1): Promise<ConsumeUsageResponse> {
   return request("/usage/consume", {
     method: "POST",
-    body: JSON.stringify({ question })
+    body: JSON.stringify({ question, count })
   });
 }
 
@@ -164,7 +167,10 @@ export async function webOpenCheckout(plan: "weekly" | "monthly" | "yearly"): Pr
 export async function webOpenPortal(): Promise<void> {
   const res = await request<{ url: string }>("/billing/portal", { method: "POST" });
   if (res?.url) {
-    window.open(res.url, "_blank");
+    const w = window.open(res.url, "_blank", "noopener,noreferrer");
+    if (!w) {
+      window.location.href = res.url;
+    }
   } else {
     throw new Error("Stripe portal URL is missing. Check backend Stripe config.");
   }
@@ -175,19 +181,94 @@ const ASK_RETRY_DELAY_MS = 500;
 
 export async function webAsk(
   payload: AskRequest,
-  onAnswer?: (answer: AgentAnswer) => void
+  onAnswer?: (answer: AgentAnswer) => void,
+  onToken?: (agentId: string, token: string) => void,
+  signal?: AbortSignal | null
 ): Promise<AskResponse> {
   debug("webBackend", "ask", { question: payload.question?.slice(0, 50), hasToken: !!getToken() });
   let lastError: Error | null = null;
   for (let attempt = 0; attempt < ASK_RETRIES; attempt++) {
     try {
-      const res = await request<AskResponse>("/ask", {
+      const url = `${getBackendUrl()}/ask`;
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...ngrokHeaders()
+      };
+      const token = getToken();
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      const res = await fetch(url, {
         method: "POST",
-        body: JSON.stringify(payload)
+        headers,
+        body: JSON.stringify(payload),
+        signal: signal ?? undefined
       });
-      debug("webBackend", "ask success", { answersCount: res.answers?.length, hasFinal: !!res.final });
-      for (const a of res.answers) onAnswer?.(a);
-      return res;
+
+      if (res.status === 401) {
+        setToken(null);
+        throw new Error("Unauthorized");
+      }
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`API ${res.status}: ${text.slice(0, 200)}`);
+      }
+
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.includes("ndjson") && !contentType.includes("x-ndjson")) {
+        const data = (await res.json()) as AskResponse;
+        for (const a of data.answers) onAnswer?.(a);
+        return data;
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No response body");
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalResponse: AskResponse | null = null;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          try {
+            const ev = JSON.parse(trimmed) as {
+              type: string;
+              token?: string;
+              agentId?: string;
+              answer?: AgentAnswer;
+              response?: AskResponse;
+              error?: string;
+            };
+            if (ev.type === "token" && ev.agentId != null && ev.token != null) {
+              onToken?.(ev.agentId, ev.token);
+            } else if (ev.type === "answer" && ev.answer) {
+              onAnswer?.(ev.answer);
+            } else if (ev.type === "done" && ev.response) {
+              finalResponse = ev.response;
+            } else if (ev.type === "error" && ev.error) {
+              throw new Error(ev.error);
+            }
+          } catch (e) {
+            if (e instanceof Error && !e.message.startsWith("Unexpected")) throw e;
+          }
+        }
+      }
+      if (buffer.trim()) {
+        try {
+          const ev = JSON.parse(buffer.trim()) as { type?: string; response?: AskResponse; error?: string };
+          if (ev.type === "done" && ev.response) finalResponse = ev.response;
+          else if (ev.type === "error" && ev.error) throw new Error(ev.error);
+        } catch {
+          /* ignore */
+        }
+      }
+      if (!finalResponse) throw new Error("Ask stream ended without response");
+      debug("webBackend", "ask success", { answersCount: finalResponse.answers?.length, hasFinal: !!finalResponse.final });
+      return finalResponse;
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e));
       const msg = lastError.message;

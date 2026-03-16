@@ -35,6 +35,7 @@ describe("webBackendClient", () => {
       };
       mockFetch.mockResolvedValueOnce({
         ok: true,
+        headers: { get: (k: string) => (k === "content-type" ? "application/json" : null) },
         json: () => Promise.resolve(mockResponse)
       });
 
@@ -56,6 +57,7 @@ describe("webBackendClient", () => {
         })
         .mockResolvedValueOnce({
           ok: true,
+          headers: { get: (k: string) => (k === "content-type" ? "application/json" : null) },
           json: () =>
             Promise.resolve({
               answers: [{ id: "explainer", title: "E", content: "ok", model: "m", durationMs: 0 }],
@@ -74,6 +76,7 @@ describe("webBackendClient", () => {
         .mockRejectedValueOnce(new Error("Failed to fetch"))
         .mockResolvedValueOnce({
           ok: true,
+          headers: { get: (k: string) => (k === "content-type" ? "application/json" : null) },
           json: () =>
             Promise.resolve({
               answers: [],

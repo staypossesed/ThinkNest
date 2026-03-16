@@ -34,6 +34,9 @@ const DEMO_ENTITLEMENTS: Entitlements = {
   maxQuestions: 15,
   usedQuestions: 0,
   remainingQuestions: 15,
+  maxMultiAnswer: 100,
+  usedMultiAnswer: 0,
+  remainingMultiAnswer: 100,
   allowWebData: false,
   allowForecast: false,
   allowDebate: false,
@@ -65,6 +68,7 @@ function getDemoAnswers(): AgentAnswer[] {
 }
 
 let backendAvailable: boolean | null = null;
+let currentAskController: AbortController | null = null;
 
 async function ensureBackendCheck(): Promise<boolean> {
   if (backendAvailable === true) return true;
@@ -85,8 +89,9 @@ export function createWebApi() {
       _onToken?: (agentId: string, token: string) => void
     ): Promise<AskResponse> {
       if (await ensureBackendCheck()) {
+        currentAskController = new AbortController();
         try {
-          return await webAsk(payload, onAnswer);
+          return await webAsk(payload, onAnswer, _onToken, currentAskController.signal);
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           debugWarn("webApi", "ask error", { msg });
@@ -105,6 +110,8 @@ export function createWebApi() {
             };
           }
           throw e;
+        } finally {
+          currentAskController = null;
         }
       }
       const demoAnswers = getDemoAnswers().slice(0, DEMO_ENTITLEMENTS.maxAgents);
@@ -151,20 +158,20 @@ export function createWebApi() {
       }
       return DEMO_ENTITLEMENTS;
     },
-    async canAsk(): Promise<CanAskResponse> {
+    async canAsk(deepResearchMode?: boolean): Promise<CanAskResponse> {
       if (await ensureBackendCheck()) {
         try {
-          return await webCanAsk();
+          return await webCanAsk(deepResearchMode);
         } catch {
           return { allowed: true, reason: null, entitlements: DEMO_ENTITLEMENTS };
         }
       }
       return { allowed: true, reason: null, entitlements: DEMO_ENTITLEMENTS };
     },
-    async consumeUsage(question: string): Promise<ConsumeUsageResponse> {
+    async consumeUsage(question: string, count = 1): Promise<ConsumeUsageResponse> {
       if (await ensureBackendCheck()) {
         try {
-          return await webConsumeUsage(question);
+          return await webConsumeUsage(question, count);
         } catch {
           return { entitlements: DEMO_ENTITLEMENTS };
         }
@@ -216,7 +223,9 @@ export function createWebApi() {
       return false;
     },
     async setAskLocale(_locale: string): Promise<void> {},
-    async stopAsk(): Promise<void> {},
+    async stopAsk(): Promise<void> {
+      if (currentAskController) currentAskController.abort("user-stop");
+    },
     async checkOllama(): Promise<{ installed: boolean; running: boolean; models: string[] }> {
       return { installed: false, running: false, models: [] };
     },

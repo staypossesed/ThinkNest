@@ -2,6 +2,7 @@ import path from "node:path";
 import { promises as fs } from "node:fs";
 import { app, shell } from "electron";
 import {
+  AgentAnswer,
   AskRequest,
   AskResponse,
   CanAskResponse,
@@ -31,6 +32,9 @@ const DEV_ENTITLEMENTS: Entitlements = {
   maxQuestions: 9999,
   usedQuestions: 0,
   remainingQuestions: 9999,
+  maxMultiAnswer: 100,
+  usedMultiAnswer: 0,
+  remainingMultiAnswer: 100,
   allowWebData: true,
   allowForecast: true,
   allowDebate: true,
@@ -108,14 +112,18 @@ class BackendClient {
     return this.request<Entitlements>("/entitlements", { method: "GET" }, true);
   }
 
-  async canAsk(): Promise<CanAskResponse> {
+  async canAsk(deepResearchMode?: boolean): Promise<CanAskResponse> {
     if (isDevMode) {
       return { allowed: true, reason: null, entitlements: { ...DEV_ENTITLEMENTS } };
     }
-    return this.request<CanAskResponse>("/usage/can-ask", { method: "POST" }, true);
+    return this.request<CanAskResponse>(
+      "/usage/can-ask",
+      { method: "POST", body: JSON.stringify({ deepResearchMode: !!deepResearchMode }) },
+      true
+    );
   }
 
-  async consumeUsage(question: string): Promise<ConsumeUsageResponse> {
+  async consumeUsage(question: string, count = 1): Promise<ConsumeUsageResponse> {
     if (isDevMode) {
       return { ok: true, entitlements: { ...DEV_ENTITLEMENTS } };
     }
@@ -123,24 +131,100 @@ class BackendClient {
       "/usage/consume",
       {
         method: "POST",
-        body: JSON.stringify({ question })
+        body: JSON.stringify({ question, count })
       },
       true
     );
   }
 
-  async ask(payload: AskRequest): Promise<AskResponse> {
+  async ask(
+    payload: AskRequest,
+    onAnswer?: (answer: AgentAnswer) => void,
+    onToken?: (agentId: string, token: string) => void,
+    signal?: AbortSignal | null
+  ): Promise<AskResponse> {
     if (isDevMode) {
       throw new Error("Use local orchestrator in dev mode.");
     }
-    return this.request<AskResponse>(
-      "/ask",
-      {
-        method: "POST",
-        body: JSON.stringify(payload)
-      },
-      true
-    );
+    const headers = new Headers({
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${this.token ?? ""}`
+    });
+    if (!this.token) {
+      throw new Error("Требуется вход через Google.");
+    }
+    const response = await fetch(`${backendBaseUrl}/ask`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+      signal: signal ?? undefined
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      let msg: string;
+      try {
+        const j = JSON.parse(text) as { error?: string };
+        msg = j.error ?? `Backend error ${response.status}`;
+      } catch {
+        msg = text || `Backend error ${response.status}`;
+      }
+      throw new Error(msg);
+    }
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.includes("ndjson") && !contentType.includes("x-ndjson")) {
+      const data = (await response.json()) as AskResponse;
+      return data;
+    }
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("No response body");
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let finalResponse: AskResponse | null = null;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const ev = JSON.parse(trimmed) as {
+            type: string;
+            token?: string;
+            agentId?: string;
+            answer?: AgentAnswer;
+            response?: AskResponse;
+            error?: string;
+          };
+          if (ev.type === "token" && ev.agentId != null && ev.token != null) {
+            onToken?.(ev.agentId, ev.token);
+          } else if (ev.type === "answer" && ev.answer) {
+            onAnswer?.(ev.answer);
+          } else if (ev.type === "done" && ev.response) {
+            finalResponse = ev.response;
+          } else if (ev.type === "error" && ev.error) {
+            throw new Error(ev.error);
+          }
+          } catch (e) {
+            if (e instanceof Error && e.message !== "Ask failed" && !e.message.includes("Unexpected")) {
+              throw e;
+            }
+          }
+      }
+    }
+    if (buffer.trim()) {
+      try {
+        const ev = JSON.parse(buffer.trim()) as { type?: string; response?: AskResponse; error?: string };
+        if (ev.type === "done" && ev.response) finalResponse = ev.response;
+        else if (ev.type === "error" && ev.error) throw new Error(ev.error);
+      } catch {
+        /* ignore parse */
+      }
+    }
+    if (!finalResponse) throw new Error("Ask stream ended without response");
+    return finalResponse;
   }
 
   async createCheckoutUrl(plan: "weekly" | "monthly" | "yearly" = "monthly"): Promise<string> {

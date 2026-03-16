@@ -10,7 +10,7 @@ dotenv.config({ path: backendEnv });
 import { askQuestion } from "./orchestrator";
 import { AskRequest } from "../shared/types";
 import { backendClient, isDevMode } from "./backend";
-import { setAskLocale, clearAskLocale, beginAsk, updateAskLocaleIfActive, stopAsk } from "./askContext";
+import { setAskLocale, clearAskLocale, beginAsk, updateAskLocaleIfActive, stopAsk, getAskSignal } from "./askContext";
 import {
   checkOllamaStatus,
   startOllamaServer,
@@ -67,11 +67,7 @@ app.whenReady().then(() => {
 
     if (!isDevMode) {
       try {
-        const response = await backendClient.ask(payload);
-        for (const answer of response.answers) {
-          onAnswer(answer);
-        }
-        return response;
+        return await backendClient.ask(payload, onAnswer, onToken, getAskSignal());
       } finally {
         clearAskLocale();
       }
@@ -112,9 +108,11 @@ app.whenReady().then(() => {
     return { ok: true };
   });
   ipcMain.handle("entitlements:get", async () => backendClient.getEntitlements());
-  ipcMain.handle("usage:can-ask", async () => backendClient.canAsk());
-  ipcMain.handle("usage:consume", async (_event, question: string) =>
-    backendClient.consumeUsage(question)
+  ipcMain.handle("usage:can-ask", async (_event, deepResearchMode?: boolean) =>
+    backendClient.canAsk(deepResearchMode)
+  );
+  ipcMain.handle("usage:consume", async (_event, question: string, count?: number) =>
+    backendClient.consumeUsage(question, count ?? 1)
   );
   ipcMain.handle("billing:checkout", async (_event, plan: "weekly" | "monthly" | "yearly" = "monthly") => {
     const url = await backendClient.createCheckoutUrl(plan);

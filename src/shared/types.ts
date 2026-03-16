@@ -24,6 +24,8 @@ export interface AskRequest {
   expertProfile?: string;
   /** User memory context injected into each agent prompt */
   memoryContext?: string;
+  /** Previous Q&A in this chat for context (e.g. "my favorite player" → Messi) */
+  chatHistory?: Array<{ question: string; answer: string }>;
 }
 
 export interface WebSource {
@@ -75,6 +77,10 @@ export interface Entitlements {
   maxQuestions: number;
   usedQuestions: number;
   remainingQuestions: number;
+  /** Мульти-ответ: 100/неделю. Обычный ответ — безлимит. */
+  maxMultiAnswer?: number;
+  usedMultiAnswer?: number;
+  remainingMultiAnswer?: number;
   /** Pro-only feature flags (default true for backward compat) */
   allowWebData?: boolean;
   allowForecast?: boolean;
@@ -120,6 +126,8 @@ export interface ConversationMessage {
 /** Чат — список сообщений */
 export interface Conversation {
   id: string;
+  /** Пользовательское название (если задано). Иначе — превью первого вопроса. */
+  title?: string;
   messages: ConversationMessage[];
   createdAt: number;
   updatedAt: number;
