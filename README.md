@@ -302,6 +302,7 @@ npm run test:ask-api   # Интеграция: /health, /ask (нужен backend
 |------|----------|
 | [README_FIRST.md](./README_FIRST.md) | Быстрый старт |
 | [DEPLOY_UBUNTU.md](./DEPLOY_UBUNTU.md) | Деплой на Ubuntu — от клона до работающей ссылки |
+| [DEPLOY_TIMEWEB_QUICK.md](./DEPLOY_TIMEWEB_QUICK.md) | Timeweb (CPU-only), быстрое исправление |
 | [WEB_MODE_SETUP.md](./WEB_MODE_SETUP.md) | Web-режим, ngrok |
 | [STRIPE_SETUP.md](./STRIPE_SETUP.md) | Stripe, подписки |
 | [docs/BILLING_VERIFY.md](./docs/BILLING_VERIFY.md) | Проверка оплаты (тесты, инструкции) |
