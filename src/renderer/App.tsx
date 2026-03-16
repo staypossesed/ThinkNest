@@ -132,7 +132,8 @@ export default function App() {
     if (messages.length === 0) return t(uiLocale, "plannerResponds");
     const last = messages[messages.length - 1];
     const count = last?.answers.length ?? 0;
-    if (count >= maxAgents) return t(uiLocale, "formingResult");
+    const effectiveMax = last?.deepResearchMode ? maxAgents : 1;
+    if (count >= effectiveMax) return t(uiLocale, "formingResult");
     return `${t(uiLocale, agentOrder[count])} ${t(uiLocale, "agentResponds")}`;
   }, [loading, isLoadingInCurrentChat, messages, maxAgents, uiLocale]);
 
@@ -305,8 +306,9 @@ export default function App() {
         return;
       }
 
-      // Force English for all agent responses and Final Answer
-      const preferredLocale: "ru" | "en" | "zh" = "en";
+      // Ответ на языке вопроса; если не определён — язык UI
+      const preferredLocale: "ru" | "en" | "zh" =
+        detectQuestionLanguage(questionText) || uiLocale || "en";
       const ent = canAsk.entitlements;
 
       const mode = (() => {
@@ -319,7 +321,7 @@ export default function App() {
       const response = await window.api.ask(
         {
           question: questionText,
-          maxAgents: ent.maxAgents,
+          maxAgents: deepResearchMode ? ent.maxAgents : 1,
           mode,
           useWebData: useWebData && (ent.allowWebData !== false),
           forecastMode: forecastMode && (ent.allowForecast !== false),
@@ -419,7 +421,6 @@ export default function App() {
         onLogout={handleLogout}
         onUpgrade={handleUpgrade}
         onManageBilling={handleManageBilling}
-        onRefreshPlan={refreshEntitlements}
         loadingSession={loadingSession}
         uiLocale={uiLocale}
         mobileOpen={sidebarOpen}
@@ -466,7 +467,7 @@ export default function App() {
         <ChatMain
           messages={messages}
           loading={isLoadingInCurrentChat}
-          maxAgents={maxAgents}
+          entitlements={entitlements}
           uiLocale={uiLocale}
           streamingTokens={isLoadingInCurrentChat ? streamingTokens : {}}
         />
