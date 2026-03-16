@@ -141,14 +141,13 @@ GOOGLE_REDIRECT_URI=https://ТВОЙ_ДОМЕН/auth/google/callback
 ## Часть 4. Модели Ollama
 
 ```bash
-ollama pull llama3.2:3b
-ollama pull qwen2.5:3b
+ollama pull llama3.1:8b
+ollama pull qwen2.5:7b
 ```
 
 Опционально:
 
 ```bash
-ollama pull deepseek-r1:7b
 ollama pull llava
 ```
 

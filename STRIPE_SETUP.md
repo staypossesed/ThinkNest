@@ -7,7 +7,7 @@
 The app now supports **server-side models**: users don't need to install Ollama. The backend runs the AI agents. Configure:
 
 1. **Deploy Ollama** on a server (same machine as backend, or a separate VM).
-2. Install models: `ollama pull phi3 mistral llama3.1 llava`
+2. Install models: `ollama pull llama3.1:8b && ollama pull qwen2.5:7b` (optional: `ollama pull llava` for images)
 3. In `backend/.env` set: `OLLAMA_BASE_URL=http://your-ollama-server:11434/v1`
 4. When running `npm run dev` (not `dev:local`), the desktop app uses the backend for ask — no local Ollama needed.
 
@@ -56,7 +56,7 @@ If you have only one price per product, that ID is what you need.
    - `invoice.payment_failed` (optional, for logging)
 4. Create → copy **Signing secret** (starts with `whsec_`) → `STRIPE_WEBHOOK_SECRET`.
 
-**Local testing:** use [ngrok](https://ngrok.com) or similar so Stripe can reach `http://localhost:8787/webhooks/stripe`.
+**Local testing:** Stripe cannot reach `localhost`. Use [ngrok](https://ngrok.com) or [Stripe CLI](https://stripe.com/docs/stripe-cli) (`stripe listen --forward-to localhost:8787/webhooks/stripe`) only when testing on your machine. **Production:** No ngrok — deploy backend to a server (VPS, cloud), set webhook URL to `https://your-api-domain/webhooks/stripe`.
 
 ---
 

@@ -42,7 +42,7 @@ npm run dev
 
 1. **Ollama-сервер:** арендовать VPS (Hetzner, DigitalOcean, Vultr) с 16+ GB RAM.
    - Установить: `curl -fsSL https://ollama.com/install.sh | sh`
-   - Модели: `ollama pull phi3 && ollama pull mistral && ollama pull llama3.1 && ollama pull llava`
+   - Модели: `ollama pull llama3.1:8b && ollama pull qwen2.5:7b` (опц. `ollama pull llava` для картинок)
    - Ollama слушает порт 11434 (по умолчанию).
 
 2. **Backend на Railway:**

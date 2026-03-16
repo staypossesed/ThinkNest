@@ -29,17 +29,18 @@ npm --prefix backend install
 
 **Минимум (4 агента):**
 ```bash
-ollama pull llama3.2:3b
-ollama pull qwen2.5:3b
+ollama pull llama3.1:8b
+ollama pull qwen2.5:7b
 ```
 
-**Опционально (картинки, Deep Research):**
+**Опционально (картинки):**
 ```bash
-ollama pull deepseek-r1:7b   # для режима Practitioner
 ollama pull llava   # распознавание картинок
 ```
 
 > `ollama pull` принимает только одну модель за раз.
+
+**Освободить место:** `ollama list` → `ollama rm <имя>` для ненужных моделей.
 
 ---
 
@@ -156,18 +157,40 @@ npm run test:ask-api   # Интеграция: /health, /ask (нужен backend
 
 ## История исправлений (Changelog)
 
-### 2026-02-27 (web parity)
+### 2026-02-27 (Pro, обновление после оплаты)
 
-**Веб = десктоп по качеству ответов:**
-- Backend промпты заменены на TRUTHFUL_FAST_PROMPT (как в prompts.private)
-- SYSTEM_PREFIX: «ЗАПРЕЩЕНО отказываться, говорить „вопрос расплывчатый“»
-- Retries в webAsk: 3 попытки при 5xx, network errors
-- Таймаут backend: 60000 (как в main)
-- Vitest: 19 тестов (prompts, askConfig, webBackendClient, orchestrator)
+**Pro-план и подписка:**
+- **Pro: 70 запросов в день** (было 500/месяц) — `PRO_ENTITLEMENTS`, миграция `004_pro_70_daily.sql`
+- **Автообновление после оплаты** — при возврате на вкладку приложения (после Stripe) entitlements и подписка обновляются без перезагрузки (`visibilitychange`)
+- **Сообщение при лимите** — фиолетовый цвет, текст «Обновите план до Pro» (`entitlements/routes.ts`, `MessageInput.tsx`)
+- **UpgradeModal** — длительность планов (7/30/365 дней), подсказка тестовой карты Stripe (4242…)
 
 ---
 
-### 2026-03-15
+### 2026-03-13–15 (Deep Research, i18n, UI)
+
+**Deep Research:**
+- **Обычный режим** — 1 ответ (maxAgents=1)
+- **Deep Research** — 2 перспективы (free) или 4 (pro)
+- Бейдж «2 PERSPECTIVES» / «4 PERSPECTIVES» только при включённом Deep Research
+- `preferredLocale` из языка вопроса для ответов
+
+**Локализация (ru/en/zh):**
+- «Ответы на» → «Язык» в LanguageSelector
+- ExportPanel, ShareButton — все подписи через `t()`
+- FinalAnswer: `finalConclusion1/2`, `synthesizedFrom2/4`, `perspectivesHeaderN`
+
+**UI:**
+- Убраны кнопки Refresh и Settings из сайдбара
+- Модели: llama3.1:8b, qwen2.5:7b (llava — опционально для картинок)
+
+**Тесты:**
+- Vitest: prompts, askConfig, webBackendClient, orchestrator
+- `npm run test:ask-api` — интеграция /health, /ask
+
+---
+
+### 2026-03-15 (billing)
 
 **Добавлено:**
 - **Кнопка «Моя подписка»** — для Pro-пользователей, открывает Stripe Customer Portal (управление подпиской)
@@ -185,7 +208,26 @@ npm run test:ask-api   # Интеграция: /health, /ask (нужен backend
 
 ---
 
-### 2026-02-27
+### 2026-02-27 (web parity)
+
+**Веб = десктоп по качеству ответов:**
+- Backend промпты заменены на TRUTHFUL_FAST_PROMPT (как в prompts.private)
+- SYSTEM_PREFIX: «ЗАПРЕЩЕНО отказываться, говорить „вопрос расплывчатый“»
+- Retries в webAsk: 3 попытки при 5xx, network errors
+- Таймаут backend: 60000 (как в main)
+- Vitest: 19 тестов (prompts, askConfig, webBackendClient, orchestrator)
+
+**Orchestrator:**
+- `getLanguageInstruction`, `getFocusInstruction`, judge language, user content suffixes
+- Fallbacks для language/instruction
+
+**Auth:**
+- Google redirect_uri, загрузка конфига из папки backend
+- `/health` возвращает `redirect_uri` для отладки
+
+---
+
+### 2026-02-27 (web mode)
 
 **Что работало некорректно:**
 - В веб-режиме отображался бейдж «Dev» — приложение выглядело как режим разработчика
@@ -209,7 +251,7 @@ npm run test:ask-api   # Интеграция: /health, /ask (нужен backend
 Увеличь `OLLAMA_TIMEOUT_MS` в `backend/.env` или `src/main/.env`. Для CPU: 90000.
 
 **Только 1 ответ из 4:**  
-Проверь: `ollama list` — должны быть `llama3.2:3b` и `qwen2.5:3b`.
+Проверь: `ollama list` — должны быть `llama3.1:8b` и `qwen2.5:7b`.
 
 **Backend недоступен:**  
 Запусти `npm run dev:backend` и `npm run dev:renderer`, открой браузер (не Electron).
